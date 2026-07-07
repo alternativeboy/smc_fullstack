@@ -1,7 +1,7 @@
 # 📊 PROGRESS — Financial Data Chat Assistant
 
 > Single source of truth for project status. Read by both the human and the agent.
-> Last updated: 2026-07-07 · Updated by: assistant (Phase 3.1 session)
+> Last updated: 2026-07-07 · Updated by: assistant (Phase 3.2 session)
 
 ---
 
@@ -33,7 +33,7 @@
 | **0 — Ground truth** | Repo, `docs/`, `.env.example`, verify `financial_data.sql` matches `erd.md` | ✅ | Root files created (.gitignore, README.md, docker-compose.yml placeholder, .env.example, data/); verification report `docs/phase0_ground_truth_report.md` | ✅ Both mismatches resolved (human-approved 2026-07-07): count 48→**49** across all docs; `ticker`/`sector` erd.md → VARCHAR(255) to match dump. Open (separate, not approved): missing-year system-prompt rule (BlackRock/Shopify). |
 | **1 — Infra** | Docker Compose (PG + Redis + init SQL + `llm_reader`), NestJS scaffold, Config, Health | ✅ | **All DoD met.** Build: `nest build` clean; unit 5/5; app-level fail-fast (empty-env boot lists all 11 required vars). **Runtime (human-run w/ Docker 2026-07-07):** `docker compose ps` → both containers `healthy`; `SELECT count(*) FROM financial_data` → **192**; as `llm_reader` SELECT ok **and** INSERT → `permission denied for table financial_data`; `npm run test:e2e` → `Health (e2e)` passed (postgres+redis `up`). | Ready for human ✅ + commit. Fixed supertest default import in `health.e2e-spec.ts`. |
 | **2 — Auth** | Register/login/refresh(rotation)/logout, bcrypt, JWT guard, throttler, httpOnly cookie, Redis token store | ✅ | **2.1 done (human-verified 2026-07-07):** `nest build` + migration `tsc` clean; `migration:run` created `users`; `\d users` matches erd.md (uuid `gen_random_uuid()`, email/password_hash/display_name, timestamps, deleted_at nullable, PK, unique `idx_users_email`); `migration:revert`+re-run clean; `llm_reader` SELECT on `users` → `permission denied`. **2.2 done (human-verified 2026-07-07):** build clean; unit 10/10 (auth: register, dup→409, login, wrong-pass→401, unknown→401); `test:e2e` green — register→201 (no `passwordHash` in body), login→200, `/auth/me` 200 w/ Bearer & 401 without/bad token, invalid body→400. **2.3 done (human-verified 2026-07-07):** unit 15/15 (refresh-token: issue-stores-hash, rotate single-use, reuse-revokes-family, invalid→401, revoke); `test:e2e` green — register/login set HttpOnly refresh cookie (no token in body); `/auth/refresh` rotates + new access token; **replay old cookie→401 AND latest cookie→401 (family revoked)**; logout clears cookie (Max-Age=0) + token dead. **2.4 done (human-verified 2026-07-07):** @nestjs/throttler v6 on register/login from THROTTLE_TTL/LIMIT; curl 12× POST /auth/login → ten `401` then `429 429` (limit 10/60s); all three e2e suites still green with throttler active (e2e split per-file to isolate throttle counters). | Sub-steps: **2.1 ✅ · 2.2 ✅ · 2.3 ✅ · 2.4 ✅** — Phase 2 human-reviewed & signed off ✅ 2026-07-07. |
-| **3 — Chat CRUD + isolation** | Entities + migrations, CRUD per OpenAPI, soft-delete, ownership → 404 | 🚧 | **3.1 done (human-verified 2026-07-07):** `nest build` + migration `tsc` clean; `migration:run` created `conversations`/`messages`/`audit_logs`; `\d` on each matches erd.md (FKs: conversations→users CASCADE, messages→conversations CASCADE, audit_logs→users SET NULL; `numeric(10,6)` cost; soft-delete `deleted_at`; all indexes); `migration:revert`+re-run clean; `llm_reader` SELECT on all three → `permission denied`. | Sub-steps: **3.1 ✅** · 3.2 CRUD + isolation→404 ⬜ · 3.3 audit + S6 ⬜. Phase DoD: S6 e2e + cross-user isolation. |
+| **3 — Chat CRUD + isolation** | Entities + migrations, CRUD per OpenAPI, soft-delete, ownership → 404 | 🚧 | **3.1 done (human-verified 2026-07-07):** `nest build` + migration `tsc` clean; `migration:run` created `conversations`/`messages`/`audit_logs`; `\d` on each matches erd.md (FKs: conversations→users CASCADE, messages→conversations CASCADE, audit_logs→users SET NULL; `numeric(10,6)` cost; soft-delete `deleted_at`; all indexes); `migration:revert`+re-run clean; `llm_reader` SELECT on all three → `permission denied`. **3.2 done (human-verified 2026-07-07):** build clean; unit 20/20 (chat: list scoping, getOne/getMessages/softDelete→404 on foreign id, owned delete); `test:e2e` green — CRUD (create 201 'New Chat' → paginated list → get empty messages → delete 200 {message} → gone + 404); **cross-user isolation: B gets 404 on A's conv for get/messages/delete, absent from B's list**; message ordering (seeded out-of-order → first/second/third, NFR-008). | Sub-steps: **3.1 ✅ · 3.2 ✅** · 3.3 audit + S6 ⬜. Phase DoD: S6 e2e + cross-user isolation. |
 | **4a — SQL guardrails** | `SqlValidatorService` + FinancialModule via `llm_reader` | ⬜ | — | DoD: attack-case unit tests pass (multi-stmt, comments, `pg_`, UNION) |
 | **4b — LLM streaming** | OpenAI stream + tool loop, SSE protocol, save message/cost/audit | ⬜ | — | DoD: S1 + S2 against real API |
 | **5 — Usage + interruption** | Redis usage + guard, partial-save on abort | ⬜ | — | DoD: S3, S4, S5 (kill connection mid-stream for real) |
@@ -66,7 +66,7 @@
 
 | ID | Summary | Phase | Status |
 |----|---------|-------|--------|
-| FR-001 | Chat application | 3, 6 | ⬜ |
+| FR-001 | Chat application | 3, 6 | 🚧 |
 | FR-002 | React + TypeScript frontend | 6 | ⬜ |
 | FR-003 | NestJS backend | 1 | ✅ |
 | FR-004 | Token-by-token streaming | 4b | ⬜ |
@@ -79,12 +79,12 @@
 | FR-011 | Configurable limit & interval | 5 | ⬜ |
 | FR-012 | User registration | 2 | ✅ |
 | FR-013 | User login | 2 | ✅ |
-| FR-014 | User isolation | 3 | ⬜ |
+| FR-014 | User isolation | 3 | 🔍 |
 | FR-015 | Stop mid-generation | 5 | ⬜ |
 | FR-016 | Partial message saved | 5 | ⬜ |
 | FR-017 | Partial cost deducted | 5 | ⬜ |
-| FR-018 | Revisit past conversations | 3, 6 | ⬜ |
-| FR-019 | Delete with confirmation | 3, 6 | ⬜ |
+| FR-018 | Revisit past conversations | 3, 6 | 🔍 |
+| FR-019 | Delete with confirmation | 3, 6 | 🚧 |
 | FR-020 | Refresh → correct history | 5, 6 | ⬜ |
 | FR-021 | Friendly limit-exceeded message | 5, 6 | ⬜ |
 | FR-022 | PostgreSQL + financial_data.sql | 0, 1 | ✅ |
@@ -100,7 +100,7 @@
 | NFR-005 | Redis for cache/usage | 1, 5 | 🚧 |
 | NFR-006 | Complete README | 7 | ⬜ |
 | NFR-007 | No dup/missing messages on refresh | 5 | ⬜ |
-| NFR-008 | History in correct order | 3 | ⬜ |
+| NFR-008 | History in correct order | 3 | 🔍 |
 | NFR-009 | Extensible architecture | 1 | ✅ |
 | NFR-010 | Graceful error handling | 1, 4b | ⬜ |
 | NFR-011 | Input validation / SQL injection | 2, 4a | 🚧 |
@@ -181,6 +181,7 @@
 
 | Date | Who | Phase | What happened | Blockers / follow-ups |
 |------|-----|-------|---------------|----------------------|
+| 2026-07-07 | human + assistant | 3.2 | Conversation CRUD + isolation: ChatModule (service scopes every query by user_id via `findOwned` → 404; soft-delete via softRemove; list paginated updated_at DESC; messages ordered created_at ASC), ChatController (JWT-guarded, ParseUUIDPipe, delete 200 {message} per spec), wired into AppModule. Verified: build clean, unit 20/20, human ran `test:e2e` → CRUD + **cross-user 404 isolation (FR-014)** + message ordering (NFR-008) green. On `feat/Phase3_Chat_CRUD_Isolation`. | 3.2 ✅ (FR-014, FR-018, NFR-008 → 🔍; FR-001, FR-019 partial 🚧). Next: 3.3 (audit + S6 — soft-delete reconciliation). Commit 3.2. |
 | 2026-07-07 | human + assistant | 3.1 | Chat data layer: `chat/entities/conversation.entity.ts` (soft-delete, user FK), `chat/entities/message.entity.ts` (created_at only, no updated_at, numeric cost), `common/entities/audit-log.entity.ts` (append-only, nullable user), migration `1783468800000-CreateChatTables.ts` (3 tables + indexes + FKs). Assistant verified build + migration typecheck; human ran the stack: `migration:run` → all three tables match erd.md, `migration:revert`+re-run clean, `llm_reader` denied on all three. On `feat/Phase3_Chat_CRUD_Isolation`. | 3.1 ✅. Next: 3.2 (conversation CRUD + isolation→404). Commit 3.1. Note for 3.3: reconcile soft-delete vs the architecture-doc S6 "cascade-removed" (soft-delete wins). |
 | 2026-07-07 | human | 2 | Reviewed all four Phase 2 sub-steps and signed off → Phase 2 row and its requirement rows (FR-012/013, NFR-012/014, CR-016, GAP-002/003/007) moved 🔍 → ✅. Overall 3/9. | Next: Phase 3 (Chat CRUD + isolation). NFR-011 stays 🚧 (SQL-injection half in 4a). Then synced Phase-1 requirement mirror rows 🔍→✅ (NFR-005 kept 🚧 — its Phase-5 cache/usage half is pending). |
 | 2026-07-07 | human + assistant | 2.4 | Rate limiting: @nestjs/throttler v6 in AuthModule (ttl=THROTTLE_TTL×1000ms, limit=THROTTLE_LIMIT), `@UseGuards(ThrottlerGuard)` on register+login. Split e2e into auth.e2e (register/login/me) + auth-refresh.e2e (rotation/logout) so per-file throttle counters stay under limit. Verified: build clean, unit 15/15; human ran curl 12× login → ten 401 then 429 429, and `test:e2e` all 3 suites green with throttler active. **Phase 2 complete → 🔍 overall.** On `feat/Phase2_Auth`. | 2.4 ✅ (NFR-014, GAP-007 🔍). Awaiting human to review all of Phase 2 and move 🔍→✅. Commit 2.4. Next: Phase 3 (Chat CRUD + isolation). |
