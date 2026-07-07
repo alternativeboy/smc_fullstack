@@ -1,12 +1,51 @@
 # ─────────────────────────────────────────────────────────────────────────────
-# PLACEHOLDER — built out in Phase 1 (Infra).
-#
-# Phase 1 will define:
-#   - postgres:15-alpine   → DB `financial_db`, loads data/financial_data.sql,
-#                            init script creates the SELECT-only `llm_reader` role
-#   - redis:7-alpine       → usage tracking + refresh-token store
-# See docs/architecture_overview.md §7 for the intended topology.
-#
-# Do NOT rely on this file yet — `docker compose up` is not expected to work
-# until Phase 1 is complete.
+# Phase 1 — Infra. Local dev stack: PostgreSQL 15 + Redis 7.
+# Variables are read from the root `.env` (copy from `.env.example`).
+# Postgres init scripts in /docker-entrypoint-initdb.d run once, in name order,
+# on first cluster init only (empty data volume):
+#   01 → load the provided financial_data dump (creates + populates the table)
+#   02 → add the 3 documented indexes (erd.md §4)
+#   03 → create the SELECT-only `llm_reader` role (Guardrail Layer 3)
 # ─────────────────────────────────────────────────────────────────────────────
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: smc_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DATABASE_NAME:-financial_db}
+      POSTGRES_USER: ${DATABASE_USER:-postgres}
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD:-postgres}
+      # Consumed by 03-llm-reader.sh (not used by the server itself)
+      LLM_READER_USER: ${LLM_READER_USER:-llm_reader}
+      LLM_READER_PASSWORD: ${LLM_READER_PASSWORD:-change_me_llm_reader}
+    ports:
+      - "${DATABASE_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./data/financial_data.sql:/docker-entrypoint-initdb.d/01-financial-data.sql:ro
+      - ./docker/postgres/02-indexes.sql:/docker-entrypoint-initdb.d/02-indexes.sql:ro
+      - ./docker/postgres/03-llm-reader.sh:/docker-entrypoint-initdb.d/03-llm-reader.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DATABASE_USER:-postgres} -d ${DATABASE_NAME:-financial_db}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: smc_redis
+    restart: unless-stopped
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  pgdata:
+  redisdata:
