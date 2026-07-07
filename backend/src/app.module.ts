@@ -7,6 +7,7 @@ import { HealthModule } from './health/health.module';
 import { AuthModule } from './auth/auth.module';
 import { ChatModule } from './chat/chat.module';
 import { CommonModule } from './common/common.module';
+import { FinancialModule } from './financial/financial.module';
 
 @Module({
   imports: [
@@ -30,6 +31,7 @@ import { CommonModule } from './common/common.module';
     HealthModule,
     AuthModule,
     ChatModule,
+    FinancialModule,
   ],
 })
 export class AppModule {}
