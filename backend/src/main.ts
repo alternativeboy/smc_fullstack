@@ -29,7 +29,7 @@ async function bootstrap() {
 
   app.enableShutdownHooks();
 
-  const port = config.get<number>('app.port') ?? 3000;
+  const port = config.get<number>('app.port') ?? 3001;
   await app.listen(port);
 }
 

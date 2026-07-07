@@ -1,7 +1,7 @@
 # 📊 PROGRESS — Financial Data Chat Assistant
 
 > Single source of truth for project status. Read by both the human and the agent.
-> Last updated: 2026-07-07 · Updated by: assistant (Phase 2.3 session)
+> Last updated: 2026-07-07 · Updated by: human (Phase 2 sign-off)
 
 ---
 
@@ -32,7 +32,7 @@
 |-------|-------|--------|-------------------------------|-------|
 | **0 — Ground truth** | Repo, `docs/`, `.env.example`, verify `financial_data.sql` matches `erd.md` | ✅ | Root files created (.gitignore, README.md, docker-compose.yml placeholder, .env.example, data/); verification report `docs/phase0_ground_truth_report.md` | ✅ Both mismatches resolved (human-approved 2026-07-07): count 48→**49** across all docs; `ticker`/`sector` erd.md → VARCHAR(255) to match dump. Open (separate, not approved): missing-year system-prompt rule (BlackRock/Shopify). |
 | **1 — Infra** | Docker Compose (PG + Redis + init SQL + `llm_reader`), NestJS scaffold, Config, Health | ✅ | **All DoD met.** Build: `nest build` clean; unit 5/5; app-level fail-fast (empty-env boot lists all 11 required vars). **Runtime (human-run w/ Docker 2026-07-07):** `docker compose ps` → both containers `healthy`; `SELECT count(*) FROM financial_data` → **192**; as `llm_reader` SELECT ok **and** INSERT → `permission denied for table financial_data`; `npm run test:e2e` → `Health (e2e)` passed (postgres+redis `up`). | Ready for human ✅ + commit. Fixed supertest default import in `health.e2e-spec.ts`. |
-| **2 — Auth** | Register/login/refresh(rotation)/logout, bcrypt, JWT guard, throttler, httpOnly cookie, Redis token store | 🚧 | **2.1 done (human-verified 2026-07-07):** `nest build` + migration `tsc` clean; `migration:run` created `users`; `\d users` matches erd.md (uuid `gen_random_uuid()`, email/password_hash/display_name, timestamps, deleted_at nullable, PK, unique `idx_users_email`); `migration:revert`+re-run clean; `llm_reader` SELECT on `users` → `permission denied`. **2.2 done (human-verified 2026-07-07):** build clean; unit 10/10 (auth: register, dup→409, login, wrong-pass→401, unknown→401); `test:e2e` green — register→201 (no `passwordHash` in body), login→200, `/auth/me` 200 w/ Bearer & 401 without/bad token, invalid body→400. **2.3 done (human-verified 2026-07-07):** unit 15/15 (refresh-token: issue-stores-hash, rotate single-use, reuse-revokes-family, invalid→401, revoke); `test:e2e` green — register/login set HttpOnly refresh cookie (no token in body); `/auth/refresh` rotates + new access token; **replay old cookie→401 AND latest cookie→401 (family revoked)**; logout clears cookie (Max-Age=0) + token dead. | Sub-steps: **2.1 ✅** · **2.2 ✅** · **2.3 ✅** · 2.4 throttler ⬜. Phase DoD: auth e2e incl. rotation + reuse detection. |
+| **2 — Auth** | Register/login/refresh(rotation)/logout, bcrypt, JWT guard, throttler, httpOnly cookie, Redis token store | ✅ | **2.1 done (human-verified 2026-07-07):** `nest build` + migration `tsc` clean; `migration:run` created `users`; `\d users` matches erd.md (uuid `gen_random_uuid()`, email/password_hash/display_name, timestamps, deleted_at nullable, PK, unique `idx_users_email`); `migration:revert`+re-run clean; `llm_reader` SELECT on `users` → `permission denied`. **2.2 done (human-verified 2026-07-07):** build clean; unit 10/10 (auth: register, dup→409, login, wrong-pass→401, unknown→401); `test:e2e` green — register→201 (no `passwordHash` in body), login→200, `/auth/me` 200 w/ Bearer & 401 without/bad token, invalid body→400. **2.3 done (human-verified 2026-07-07):** unit 15/15 (refresh-token: issue-stores-hash, rotate single-use, reuse-revokes-family, invalid→401, revoke); `test:e2e` green — register/login set HttpOnly refresh cookie (no token in body); `/auth/refresh` rotates + new access token; **replay old cookie→401 AND latest cookie→401 (family revoked)**; logout clears cookie (Max-Age=0) + token dead. **2.4 done (human-verified 2026-07-07):** @nestjs/throttler v6 on register/login from THROTTLE_TTL/LIMIT; curl 12× POST /auth/login → ten `401` then `429 429` (limit 10/60s); all three e2e suites still green with throttler active (e2e split per-file to isolate throttle counters). | Sub-steps: **2.1 ✅ · 2.2 ✅ · 2.3 ✅ · 2.4 ✅** — Phase 2 human-reviewed & signed off ✅ 2026-07-07. |
 | **3 — Chat CRUD + isolation** | Entities + migrations, CRUD per OpenAPI, soft-delete, ownership → 404 | ⬜ | — | DoD: S6 e2e + cross-user isolation test |
 | **4a — SQL guardrails** | `SqlValidatorService` + FinancialModule via `llm_reader` | ⬜ | — | DoD: attack-case unit tests pass (multi-stmt, comments, `pg_`, UNION) |
 | **4b — LLM streaming** | OpenAI stream + tool loop, SSE protocol, save message/cost/audit | ⬜ | — | DoD: S1 + S2 against real API |
@@ -40,7 +40,7 @@
 | **6 — Frontend** | Auth pages, chat + `useStreamChat`, ToolCallWidget, Markdown/charts, sidebar, usage badge | ⬜ | — | DoD: human clicks through every scenario in a browser |
 | **7 — Polish** | README, full S1–S6 e2e, Helmet, audit review | ⬜ | — | README = 10% of grade |
 
-**Overall:** `2 / 9` phases done (Phase 0 ✅; Phase 1 ✅)
+**Overall:** `3 / 9` phases done (Phase 0 ✅; Phase 1 ✅; Phase 2 ✅)
 
 ---
 
@@ -68,7 +68,7 @@
 |----|---------|-------|--------|
 | FR-001 | Chat application | 3, 6 | ⬜ |
 | FR-002 | React + TypeScript frontend | 6 | ⬜ |
-| FR-003 | NestJS backend | 1 | 🔍 |
+| FR-003 | NestJS backend | 1 | ✅ |
 | FR-004 | Token-by-token streaming | 4b | ⬜ |
 | FR-005 | SQL tool call visible in UI | 4b, 6 | ⬜ |
 | FR-006 | Markdown render (tables, charts) | 6 | ⬜ |
@@ -77,8 +77,8 @@
 | FR-009 | Spending limit per user (default $1) | 5 | ⬜ |
 | FR-010 | Limit reset on fixed interval | 5 | ⬜ |
 | FR-011 | Configurable limit & interval | 5 | ⬜ |
-| FR-012 | User registration | 2 | 🔍 |
-| FR-013 | User login | 2 | 🔍 |
+| FR-012 | User registration | 2 | ✅ |
+| FR-013 | User login | 2 | ✅ |
 | FR-014 | User isolation | 3 | ⬜ |
 | FR-015 | Stop mid-generation | 5 | ⬜ |
 | FR-016 | Partial message saved | 5 | ⬜ |
@@ -87,7 +87,7 @@
 | FR-019 | Delete with confirmation | 3, 6 | ⬜ |
 | FR-020 | Refresh → correct history | 5, 6 | ⬜ |
 | FR-021 | Friendly limit-exceeded message | 5, 6 | ⬜ |
-| FR-022 | PostgreSQL + financial_data.sql | 0, 1 | 🔍 |
+| FR-022 | PostgreSQL + financial_data.sql | 0, 1 | ✅ |
 
 ### Non-Functional (NFR)
 
@@ -96,17 +96,17 @@
 | NFR-001 | Low-latency streaming | 4b | ⬜ |
 | NFR-002 | Polished UI | 6 | ⬜ |
 | NFR-003 | Well-separated modules | 1–5 | ⬜ |
-| NFR-004 | Docker Compose | 1 | 🔍 |
-| NFR-005 | Redis for cache/usage | 1, 5 | 🔍 |
+| NFR-004 | Docker Compose | 1 | ✅ |
+| NFR-005 | Redis for cache/usage | 1, 5 | 🚧 |
 | NFR-006 | Complete README | 7 | ⬜ |
 | NFR-007 | No dup/missing messages on refresh | 5 | ⬜ |
 | NFR-008 | History in correct order | 3 | ⬜ |
-| NFR-009 | Extensible architecture | 1 | 🔍 |
+| NFR-009 | Extensible architecture | 1 | ✅ |
 | NFR-010 | Graceful error handling | 1, 4b | ⬜ |
 | NFR-011 | Input validation / SQL injection | 2, 4a | 🚧 |
-| NFR-012 | bcrypt password hashing | 2 | 🔍 |
-| NFR-013 | API key via config | 1 | 🔍 |
-| NFR-014 | Rate limiting | 2 | ⬜ |
+| NFR-012 | bcrypt password hashing | 2 | ✅ |
+| NFR-013 | API key via config | 1 | ✅ |
+| NFR-014 | Rate limiting | 2 | ✅ |
 
 ### Compliance (CR) — key items
 
@@ -118,28 +118,28 @@
 | CR-005–008 | PDPA (consent, disclosure, erasure, breach) | 2, 3, 7 | ⬜ |
 | CR-009–011 | GDPR (by design, erasure, portability) | 2, 3 | ⬜ |
 | CR-013 | Disclose data source & coverage | 4b | ⬜ |
-| CR-014 | OpenAI key never exposed | 1 | 🔍 |
+| CR-014 | OpenAI key never exposed | 1 | ✅ |
 | CR-015 | Spend tracking within $10 budget | 5 | ⬜ |
-| CR-016 | Hybrid token storage + rotation | 2 | 🔍 |
-| CR-017 | CORS allowlist + credentials | 1 | 🔍 |
+| CR-016 | Hybrid token storage + rotation | 2 | ✅ |
+| CR-017 | CORS allowlist + credentials | 1 | ✅ |
 
 ### Gaps (GAP)
 
 | ID | Summary | Phase | Status |
 |----|---------|-------|--------|
 | GAP-001 | SQL injection prevention | 4a | ⬜ |
-| GAP-002 | Authentication | 2 | 🔍 |
-| GAP-003 | Password storage | 2 | 🔍 |
+| GAP-002 | Authentication | 2 | ✅ |
+| GAP-003 | Password storage | 2 | ✅ |
 | GAP-004 | Data accuracy verification | 4a | ⬜ |
 | GAP-005 | OpenAI failure handling | 4b | ⬜ |
-| GAP-006 | API key management | 1 | 🔍 |
-| GAP-007 | Auth rate limiting | 2 | ⬜ |
+| GAP-006 | API key management | 1 | ✅ |
+| GAP-007 | Auth rate limiting | 2 | ✅ |
 | GAP-008 | Audit logging | 3 | ⬜ |
 | GAP-009 | HTTPS/TLS (+ Secure cookie note) | 7 | ⬜ |
 | GAP-010 | Data retention / cleanup | 7 | ⬜ |
-| GAP-011 | CORS config (credentials: true) | 1 | 🔍 |
-| GAP-012 | Health endpoint | 1 | 🔍 |
-| GAP-013 | DB connection pooling | 1 | 🔍 |
+| GAP-011 | CORS config (credentials: true) | 1 | ✅ |
+| GAP-012 | Health endpoint | 1 | ✅ |
+| GAP-013 | DB connection pooling | 1 | ✅ |
 | GAP-014 | Test strategy | 1–7 | ⬜ |
 
 ---
@@ -171,6 +171,7 @@
 | 2026-07-07 | Phase 2.2 register/login return access token in **body only** (no refresh cookie yet) | Temporary, scoped deviation from openapi; the httpOnly refresh cookie lands in Phase 2.3 and realigns the Set-Cookie contract | backend/src/auth/auth.controller.ts |
 | 2026-07-07 | Phase 2.3 realigns register/login/refresh with the openapi Set-Cookie contract (resolves the 2.2 deviation). No openapi edit needed. | `/auth/refresh` + `/auth/logout` already in spec; register/login's documented Set-Cookie now actually fires | backend/src/auth/auth.controller.ts, backend/src/auth/services/refresh-token.service.ts |
 | 2026-07-07 | Logout is cookie-driven, not JwtAuthGuard-protected | openapi security is OR (BearerAuth OR RefreshCookie); a user with an expired access token must still be able to clear their refresh cookie. Best-effort revoke + always clear cookie. | backend/src/auth/auth.controller.ts |
+| 2026-07-07 | Throttle `register`+`login` only (not all auth routes); split e2e into two files | ThrottlerGuard counts per-IP across guarded routes; per-file apps get isolated counters so legit e2e flows stay under limit 10 without a test-only .env override. refresh/logout have their own reuse protection. | backend/src/auth/auth.module.ts, backend/test/auth*.e2e-spec.ts |
 
 ---
 
@@ -180,6 +181,8 @@
 
 | Date | Who | Phase | What happened | Blockers / follow-ups |
 |------|-----|-------|---------------|----------------------|
+| 2026-07-07 | human | 2 | Reviewed all four Phase 2 sub-steps and signed off → Phase 2 row and its requirement rows (FR-012/013, NFR-012/014, CR-016, GAP-002/003/007) moved 🔍 → ✅. Overall 3/9. | Next: Phase 3 (Chat CRUD + isolation). NFR-011 stays 🚧 (SQL-injection half in 4a). Then synced Phase-1 requirement mirror rows 🔍→✅ (NFR-005 kept 🚧 — its Phase-5 cache/usage half is pending). |
+| 2026-07-07 | human + assistant | 2.4 | Rate limiting: @nestjs/throttler v6 in AuthModule (ttl=THROTTLE_TTL×1000ms, limit=THROTTLE_LIMIT), `@UseGuards(ThrottlerGuard)` on register+login. Split e2e into auth.e2e (register/login/me) + auth-refresh.e2e (rotation/logout) so per-file throttle counters stay under limit. Verified: build clean, unit 15/15; human ran curl 12× login → ten 401 then 429 429, and `test:e2e` all 3 suites green with throttler active. **Phase 2 complete → 🔍 overall.** On `feat/Phase2_Auth`. | 2.4 ✅ (NFR-014, GAP-007 🔍). Awaiting human to review all of Phase 2 and move 🔍→✅. Commit 2.4. Next: Phase 3 (Chat CRUD + isolation). |
 | 2026-07-07 | human + assistant | 2.3 | Refresh rotation + cookie + logout + reuse detection: `auth/services/refresh-token.service.ts` (jti + sha256 hash in Redis `refresh:{userId}:{jti}`, single-use rotation, reuse→SCAN+DEL family, best-effort revoke). AuthService now issues refresh on register/login + `refresh()`/`logout()`. Controller sets/clears httpOnly refresh cookie (Secure/SameSite/Path from `app.cookie`, Max-Age=TTL); added `POST /auth/refresh` + `POST /auth/logout`; refresh token only in cookie, never in body. Verified: build clean, unit 15/15, human ran `test:e2e` → full rotation/reuse/logout flow green. On `feat/Phase2_Auth`. | 2.3 ✅ (CR-016 🔍). Realigned Set-Cookie contract (2.2 deviation resolved). Next: 2.4 (throttler → 429). Commit 2.3 when ready. |
 | 2026-07-07 | human + assistant | 2.2 | Register/login + access-token auth: RegisterDto/LoginDto (class-validator), AuthService (bcrypt cost from `getOrThrow('BCRYPT_COST')`, dup→409, bad creds→401, same 401 for unknown-email/wrong-pass), JwtStrategy + JwtAuthGuard + `@CurrentUser()`, AuthController (register/login/`GET /auth/me`), AuthModule wired. Added `/auth/me` to openapi first (§8). Fixed a `number\|undefined` config type via getOrThrow. Verified: build clean, unit 10/10, human ran `test:e2e` → Auth+Health green. On `feat/Phase2_Auth`. | 2.2 ✅. Refresh token/cookie deferred to 2.3 (temporary no-cookie deviation logged). Next: 2.3 (refresh rotation + reuse detection). Commit 2.2 when ready. |
 | 2026-07-07 | human + assistant | 2.1 | Users data layer: `common/entities/base.entity.ts`, `auth/entities/user.entity.ts` (password_hash select:false, soft-delete), migration `1783382400000-CreateUsers.ts` (native `gen_random_uuid()`). Assistant verified build + migration typecheck; human ran the stack: `migration:run` → `users` matches erd.md, `migration:revert`+re-run clean, `llm_reader` SELECT users → permission denied. On branch `feat/Phase2_Auth`. | 2.1 ✅. Next: 2.2 (register/login access-token auth). Commit 2.1 when ready. |

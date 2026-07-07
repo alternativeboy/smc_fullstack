@@ -11,6 +11,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { ThrottlerGuard } from '@nestjs/throttler';
 import { CookieOptions, Request, Response } from 'express';
 import { AuthUser, CurrentUser } from '../common/decorators/current-user.decorator';
 import { AuthResult, AuthService } from './auth.service';
@@ -27,12 +28,15 @@ export class AuthController {
     private readonly config: ConfigService,
   ) {}
 
+  // Brute-force protection on the credential-accepting routes (NFR-014/GAP-007).
   @Post('register')
+  @UseGuards(ThrottlerGuard)
   async register(@Body() dto: RegisterDto, @Res({ passthrough: true }) res: Response) {
     return this.respond(res, await this.auth.register(dto));
   }
 
   @Post('login')
+  @UseGuards(ThrottlerGuard)
   @HttpCode(HttpStatus.OK)
   async login(@Body() dto: LoginDto, @Res({ passthrough: true }) res: Response) {
     return this.respond(res, await this.auth.login(dto));
