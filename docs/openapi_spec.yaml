@@ -430,6 +430,30 @@ paths:
               schema:
                 type: string
 
+  /auth/me:
+    get:
+      tags: [Auth]
+      summary: Get the current authenticated user
+      operationId: getCurrentUser
+      security: [{ BearerAuth: [] }]
+      description: |
+        Returns the profile of the user identified by the Bearer access token.
+        Used by the frontend to hydrate the session on app mount.
+        **Traceability:** FR-013, GAP-002
+      responses:
+        '200':
+          description: Current user profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProfile'
+        '401':
+          description: Missing or invalid access token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
   # ══════════════════════════════════════════════════════
   # CHAT MODULE — FR-001, FR-014, FR-018, FR-019, FR-020
   # ══════════════════════════════════════════════════════
