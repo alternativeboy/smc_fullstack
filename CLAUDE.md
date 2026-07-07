@@ -8,7 +8,7 @@
 ## 1. What we're building
 
 An AI-powered chat app where users ask natural-language questions about the income-statement
-data of 48 U.S. public companies (2022–2025). An LLM (OpenAI GPT-4o) answers **only** from a
+data of 49 U.S. public companies (2022–2025). An LLM (OpenAI GPT-4o) answers **only** from a
 PostgreSQL database by generating SQL through a single `execute_sql` tool. Responses stream
 token-by-token. There is auth, per-user spending limits, and conversation history.
 
