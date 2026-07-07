@@ -5,6 +5,8 @@ import { AppConfigModule } from './config/config.module';
 import { RedisModule } from './redis/redis.module';
 import { HealthModule } from './health/health.module';
 import { AuthModule } from './auth/auth.module';
+import { ChatModule } from './chat/chat.module';
+import { CommonModule } from './common/common.module';
 
 @Module({
   imports: [
@@ -24,8 +26,10 @@ import { AuthModule } from './auth/auth.module';
       }),
     }),
     RedisModule,
+    CommonModule,
     HealthModule,
     AuthModule,
+    ChatModule,
   ],
 })
 export class AppModule {}
