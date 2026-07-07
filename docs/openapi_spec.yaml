@@ -1,0 +1,690 @@
+openapi: 3.0.3
+info:
+  title: Financial Data Chat API
+  description: |
+    AI-powered financial data chat assistant API.
+    A chat system that uses an LLM (OpenAI GPT-4o) to query financial data of
+    U.S. public companies via a SQL database (48 companies, 2022-2025).
+
+    ## Authentication model (CR-016)
+    - The **access token** is short-lived (~15 min) and returned in the JSON body of
+      `/auth/register`, `/auth/login`, and `/auth/refresh`. The client keeps it **in memory
+      only** and sends it as `Authorization: Bearer <accessToken>` on every protected call.
+    - The **refresh token** is long-lived and delivered as an **httpOnly, Secure,
+      SameSite=Strict cookie** scoped to `/api/auth/refresh`. It is never present in any
+      response body and is never readable by JavaScript. Each refresh **rotates** the token
+      (single-use); its hash is tracked in Redis for revocation and reuse detection.
+
+    ## Streaming model (FR-004)
+    Message responses stream as `text/event-stream` (SSE) over a **POST** request. Clients
+    must consume this with `fetch()` + `ReadableStream` (not the native `EventSource`, which
+    cannot issue POST requests nor set an `Authorization` header). Aborting the request (Stop
+    button or browser refresh) via an `AbortController` causes the backend to cancel the
+    OpenAI stream, persist the partial message, and charge only for tokens produced.
+  version: 1.0.0
+  contact:
+    name: Engineering Team
+
+servers:
+  - url: http://localhost:3000/api
+    description: Local development
+
+# ─── Security ────────────────────────────────────────────
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Short-lived JWT access token from /auth/login (kept in memory by the client)
+    RefreshCookie:
+      type: apiKey
+      in: cookie
+      name: refreshToken
+      description: |
+        httpOnly, Secure, SameSite=Strict refresh-token cookie, scoped to /api/auth/refresh.
+        Set by the server via Set-Cookie; transmitted automatically by the browser.
+        Not readable by JavaScript.
+
+  # ─── Schemas ────────────────────────────────────────────
+  schemas:
+    # --- Auth ---
+    RegisterRequest:
+      type: object
+      required: [email, password, displayName]
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 255
+          example: user@example.com
+        password:
+          type: string
+          minLength: 8
+          maxLength: 128
+          description: Minimum 8 characters
+        displayName:
+          type: string
+          minLength: 1
+          maxLength: 100
+          example: John Doe
+
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+
+    AuthResponse:
+      type: object
+      description: |
+        Returned by /auth/register, /auth/login, and /auth/refresh.
+        NOTE: the refresh token is NOT included here — it is delivered separately as an
+        httpOnly Set-Cookie header. Only the access token is exposed to client JavaScript.
+      properties:
+        accessToken:
+          type: string
+          description: Short-lived JWT access token (client keeps this in memory only)
+        expiresIn:
+          type: integer
+          description: Access token expiry in seconds
+          example: 900
+        user:
+          $ref: '#/components/schemas/UserProfile'
+
+    UserProfile:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        displayName:
+          type: string
+
+    # --- Chat ---
+    Conversation:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+          example: "Apple's financial performance"
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    ConversationDetail:
+      allOf:
+        - $ref: '#/components/schemas/Conversation'
+        - type: object
+          properties:
+            messages:
+              type: array
+              items:
+                $ref: '#/components/schemas/Message'
+
+    Message:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        role:
+          type: string
+          enum: [user, assistant, tool]
+        content:
+          type: string
+          nullable: true
+        toolCalls:
+          type: array
+          nullable: true
+          items:
+            $ref: '#/components/schemas/ToolCall'
+        toolResults:
+          type: array
+          nullable: true
+          items:
+            $ref: '#/components/schemas/ToolResult'
+        cost:
+          type: number
+          format: float
+          description: Cost in USD for this message
+        isPartial:
+          type: boolean
+          description: True if generation was stopped mid-stream
+        createdAt:
+          type: string
+          format: date-time
+
+    ToolCall:
+      type: object
+      properties:
+        id:
+          type: string
+        function:
+          type: object
+          properties:
+            name:
+              type: string
+              example: execute_sql
+            arguments:
+              type: string
+              description: JSON string of arguments
+
+    ToolResult:
+      type: object
+      properties:
+        toolCallId:
+          type: string
+        query:
+          type: string
+          description: The SQL query that was executed
+        rows:
+          type: array
+          items:
+            type: object
+        rowCount:
+          type: integer
+
+    CreateMessageRequest:
+      type: object
+      required: [content]
+      properties:
+        content:
+          type: string
+          minLength: 1
+          maxLength: 4000
+          example: "What was Apple's net income in 2023?"
+
+    # --- Usage ---
+    UsageStatus:
+      type: object
+      properties:
+        currentSpend:
+          type: number
+          format: float
+          example: 0.0234
+        limit:
+          type: number
+          format: float
+          example: 1.0
+        remaining:
+          type: number
+          format: float
+          example: 0.9766
+        resetAt:
+          type: string
+          format: date-time
+        resetIntervalSeconds:
+          type: integer
+          example: 3600
+
+    # --- Error ---
+    ErrorResponse:
+      type: object
+      properties:
+        statusCode:
+          type: integer
+        error:
+          type: string
+        message:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+
+    UsageLimitError:
+      allOf:
+        - $ref: '#/components/schemas/ErrorResponse'
+        - type: object
+          properties:
+            resetAt:
+              type: string
+              format: date-time
+              description: When the usage limit will reset
+
+    # --- Health ---
+    HealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [ok, error]
+        info:
+          type: object
+          properties:
+            database:
+              type: object
+              properties:
+                status:
+                  type: string
+                  enum: [up, down]
+            redis:
+              type: object
+              properties:
+                status:
+                  type: string
+                  enum: [up, down]
+        timestamp:
+          type: string
+          format: date-time
+
+# ─── Paths ───────────────────────────────────────────────
+paths:
+
+  # ══════════════════════════════════════════════════════
+  # AUTH MODULE — FR-012, FR-013, GAP-002, GAP-003, CR-016
+  # ══════════════════════════════════════════════════════
+
+  /auth/register:
+    post:
+      tags: [Auth]
+      summary: Register a new user account
+      operationId: register
+      description: |
+        Create a new account — the password is hashed with bcrypt (cost 12).
+        On success, returns the access token in the body and sets the refresh-token
+        httpOnly cookie via Set-Cookie.
+        **Rate limit:** 5 requests/minute per IP
+        **Traceability:** FR-012, CR-005, GAP-003, CR-016
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '201':
+          description: User registered successfully
+          headers:
+            Set-Cookie:
+              description: |
+                refreshToken=<jwt>; HttpOnly; Secure; SameSite=Strict;
+                Path=/api/auth/refresh; Max-Age=604800
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '400':
+          description: Validation error (invalid email, password too short)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Email already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: Login with email and password
+      operationId: login
+      description: |
+        Authenticate the user, return the access token in the body, and set the
+        refresh-token httpOnly cookie via Set-Cookie.
+        **Rate limit:** 10 requests/minute per IP
+        **Traceability:** FR-013, CR-016
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Login successful
+          headers:
+            Set-Cookie:
+              description: |
+                refreshToken=<jwt>; HttpOnly; Secure; SameSite=Strict;
+                Path=/api/auth/refresh; Max-Age=604800
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '401':
+          description: Invalid email or password
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Too many login attempts
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/refresh:
+    post:
+      tags: [Auth]
+      summary: Rotate the refresh token and issue a new access token
+      operationId: refreshToken
+      security: [{ RefreshCookie: [] }]
+      description: |
+        Uses the refresh token from the httpOnly cookie (no request body) to issue a new
+        access token. This endpoint **rotates** the refresh token: the presented token is
+        invalidated and a new one is set via Set-Cookie (single-use). If the presented token
+        is missing, expired, or has already been used (reuse detected), the entire session
+        family is revoked in Redis and 401 is returned.
+        **Traceability:** CR-016
+      responses:
+        '200':
+          description: New access token issued; refresh cookie rotated
+          headers:
+            Set-Cookie:
+              description: |
+                refreshToken=<rotated-jwt>; HttpOnly; Secure; SameSite=Strict;
+                Path=/api/auth/refresh; Max-Age=604800
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '401':
+          description: Missing, invalid, expired, or reused refresh token (session revoked)
+
+  /auth/logout:
+    post:
+      tags: [Auth]
+      summary: Logout and invalidate the refresh token
+      operationId: logout
+      security: [{ BearerAuth: [] }, { RefreshCookie: [] }]
+      description: |
+        Deletes the presented refresh token from the Redis store and clears the httpOnly
+        cookie via Set-Cookie (Max-Age=0).
+        **Traceability:** CR-016
+      responses:
+        '200':
+          description: Logged out successfully
+          headers:
+            Set-Cookie:
+              description: refreshToken=; HttpOnly; Secure; SameSite=Strict; Path=/api/auth/refresh; Max-Age=0
+              schema:
+                type: string
+
+  # ══════════════════════════════════════════════════════
+  # CHAT MODULE — FR-001, FR-014, FR-018, FR-019, FR-020
+  # ══════════════════════════════════════════════════════
+
+  /conversations:
+    get:
+      tags: [Chat]
+      summary: List all conversations for the current user
+      operationId: listConversations
+      security: [{ BearerAuth: [] }]
+      description: |
+        Return all conversations (non-deleted) owned by the authenticated user, sorted by most recent.
+        **Traceability:** FR-014, FR-018, FR-020
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+            maximum: 100
+      responses:
+        '200':
+          description: List of conversations
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Conversation'
+                  total:
+                    type: integer
+                  page:
+                    type: integer
+        '401':
+          description: Unauthorized
+
+    post:
+      tags: [Chat]
+      summary: Create a new conversation
+      operationId: createConversation
+      security: [{ BearerAuth: [] }]
+      description: |
+        Create a new conversation — the title is auto-generated from the first message later.
+        **Traceability:** FR-001
+      responses:
+        '201':
+          description: Conversation created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Conversation'
+
+  /conversations/{conversationId}:
+    get:
+      tags: [Chat]
+      summary: Get conversation with messages
+      operationId: getConversation
+      security: [{ BearerAuth: [] }]
+      description: |
+        Load full conversation with message history — ensures correct order (NFR-008) and no duplicates (NFR-007).
+        **Traceability:** FR-018, FR-020, NFR-007, NFR-008
+      parameters:
+        - name: conversationId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Conversation with messages
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConversationDetail'
+        '404':
+          description: Conversation not found or not owned by user
+
+    delete:
+      tags: [Chat]
+      summary: Delete a conversation
+      operationId: deleteConversation
+      security: [{ BearerAuth: [] }]
+      description: |
+        Soft-delete a conversation. The frontend must show a confirmation dialog first (FR-019).
+        **Traceability:** FR-019, CR-007
+      parameters:
+        - name: conversationId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Conversation deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Conversation deleted successfully
+        '404':
+          description: Conversation not found
+
+  # ══════════════════════════════════════════════════════
+  # MESSAGES (STREAMING SSE) — FR-004, FR-005, FR-007,
+  # FR-008, FR-015, FR-016, FR-017
+  # ══════════════════════════════════════════════════════
+
+  /conversations/{conversationId}/messages:
+    get:
+      tags: [Messages]
+      summary: Get all messages in a conversation
+      operationId: getMessages
+      security: [{ BearerAuth: [] }]
+      description: |
+        Fetch all messages in a conversation ordered by created_at ASC.
+        **Traceability:** FR-018, FR-020, NFR-008
+      parameters:
+        - name: conversationId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Messages list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Message'
+
+    post:
+      tags: [Messages]
+      summary: Send message and receive streamed AI response (SSE over fetch)
+      operationId: sendMessage
+      security: [{ BearerAuth: [] }]
+      description: |
+        Send a message and receive the AI response as a stream (Server-Sent Events).
+
+        ### Transport:
+        The response is `text/event-stream` delivered on this POST request. Clients must
+        consume it with `fetch()` + `ReadableStream` — the native `EventSource` cannot be
+        used here because it issues only GET requests and cannot set the `Authorization`
+        header. The SSE wire format (`event:` / `data:` lines) is unchanged.
+
+        ### SSE Event Types:
+        | Event | Data | Description |
+        |-------|------|-------------|
+        | `token` | `{ "content": "..." }` | Individual text token from LLM |
+        | `tool_call` | `{ "name": "execute_sql", "arguments": "..." }` | SQL tool call (render in UI — FR-005) |
+        | `tool_result` | `{ "query": "...", "rows": [...], "rowCount": N }` | SQL execution result |
+        | `usage` | `{ "promptTokens": N, "completionTokens": N, "cost": 0.xx }` | Token usage & cost |
+        | `done` | `{ "messageId": "..." }` | Stream complete |
+        | `error` | `{ "message": "..." }` | Error occurred |
+
+        ### Abort:
+        Client disconnect (abort the fetch via AbortController — e.g. Stop button or browser
+        refresh) → backend detects `req.on('close')`, cancels the OpenAI stream, saves the
+        partial message (FR-016), and deducts the partial cost (FR-017).
+
+        ### Pre-flight check:
+        Before calling OpenAI, check the usage limit. If exceeded → 429 response.
+
+        **Rate limit:** 10 requests/minute per user
+        **Traceability:** FR-001, FR-004, FR-005, FR-007, FR-008, FR-015, FR-016, FR-017, CR-001, CR-003
+      parameters:
+        - name: conversationId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateMessageRequest'
+      responses:
+        '200':
+          description: SSE stream of AI response
+          content:
+            text/event-stream:
+              schema:
+                type: string
+        '400':
+          description: Invalid request (empty message)
+        '404':
+          description: Conversation not found
+        '429':
+          description: Usage limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UsageLimitError'
+
+  # ══════════════════════════════════════════════════════
+  # USAGE MODULE — FR-009, FR-010, FR-011, FR-021, CR-015
+  # ══════════════════════════════════════════════════════
+
+  /usage/status:
+    get:
+      tags: [Usage]
+      summary: Get current usage status for the authenticated user
+      operationId: getUsageStatus
+      security: [{ BearerAuth: [] }]
+      description: |
+        Return current spend, limit, remaining balance, and reset time.
+        Data is read from Redis (atomic, real-time).
+        **Traceability:** FR-009, FR-010, FR-011, FR-021, CR-015
+      responses:
+        '200':
+          description: Current usage status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UsageStatus'
+
+  # ══════════════════════════════════════════════════════
+  # HEALTH MODULE — GAP-012
+  # ══════════════════════════════════════════════════════
+
+  /health:
+    get:
+      tags: [Health]
+      summary: Health check — database and Redis connectivity
+      operationId: healthCheck
+      description: |
+        Check liveness of PostgreSQL and Redis.
+        **Traceability:** GAP-012
+      responses:
+        '200':
+          description: All services healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthStatus'
+        '503':
+          description: One or more services unhealthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthStatus'
