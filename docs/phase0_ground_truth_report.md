@@ -1,6 +1,6 @@
 # 🔎 Phase 0 — Ground-Truth Verification Report
 
-> Date: 2026-07-07 · Author: assistant (agent) · Status: ready for human review
+> Date: 2026-07-07 · Author: assistant (agent) · Status: ✅ resolved (both mismatches actioned, human-approved)
 > Source dump: `data/financial_data.sql` (md5 `b04bff3880dfc125209370488074260e`, 192 data rows)
 > Compared against: `docs/erd.md` §4, `docs/prompt_spec.md` §1/§2
 
@@ -23,24 +23,26 @@ below were surfaced first and **not** auto-fixed. The dump itself was never modi
 - **Table name:** `financial_data` — ✅ match
 - **Columns:** 8 columns, same names, same order — ✅ match
 
-| Column | erd.md type | Dump DDL type | Match |
-|--------|-------------|---------------|:-----:|
+| Column | erd.md type (as found → now) | Dump DDL type | Match |
+|--------|------------------------------|---------------|:-----:|
 | company | VARCHAR(255) | VARCHAR(255) | ✅ |
-| ticker | **VARCHAR(10)** | **VARCHAR(255)** | ❌ length |
-| sector | **VARCHAR(50)** | **VARCHAR(255)** | ❌ length |
+| ticker | ~~VARCHAR(10)~~ → **VARCHAR(255)** | VARCHAR(255) | ✅ (erd relaxed) |
+| sector | ~~VARCHAR(50)~~ → **VARCHAR(255)** | VARCHAR(255) | ✅ (erd relaxed) |
 | year | INTEGER | INTEGER | ✅ |
 | revenue | BIGINT | BIGINT | ✅ |
 | net_income | BIGINT | BIGINT | ✅ |
 | operating_income | BIGINT | BIGINT | ✅ |
 | gross_profit | BIGINT | BIGINT | ✅ |
 
-**Mismatch 1 — VARCHAR lengths.** `erd.md` documents `ticker VARCHAR(10)` and
-`sector VARCHAR(50)`; the provided dump declares both as `VARCHAR(255)`.
-- Column **names and base types** (VARCHAR / INTEGER / BIGINT) all match — only the declared
-  lengths differ. The LLM system prompt only depends on names + base types, so **the prompt is
-  unaffected**.
-- The actual data fits the stricter ERD lengths (max ticker = 5 chars, max sector = 10 chars),
-  so ERD's lengths are data-compatible — no truncation risk if aligned later.
+**Mismatch 1 — VARCHAR lengths → ✅ RESOLVED.** As found, `erd.md` documented `ticker VARCHAR(10)`
+and `sector VARCHAR(50)` while the provided dump declared both as `VARCHAR(255)`.
+- Column **names and base types** (VARCHAR / INTEGER / BIGINT) all matched — only the declared
+  lengths differed. The LLM system prompt only depends on names + base types, so the prompt was
+  unaffected.
+- The actual data fits either width (max ticker = 5 chars, max sector = 10 chars), so no
+  truncation risk in any direction.
+- **Resolution:** `erd.md` §4 relaxed to `ticker VARCHAR(255)` / `sector VARCHAR(255)` to match the
+  provided dump (chosen over migrating the dump). NOT-NULL intent retained.
 
 **Informational — constraints & indexes.** The provided dump has **no** `NOT NULL`, no primary
 key, and no indexes. `erd.md` documents `company/ticker/sector/year` as `NOT NULL` plus three
@@ -56,25 +58,27 @@ type mismatch.
 | Check | Docs say | Dump actually has | Result |
 |-------|----------|-------------------|:------:|
 | Company **names** (per sector) | see `prompt_spec.md` §1 | identical set | ✅ exact match |
-| Company **count** | **48** | **49** | ❌ mismatch |
+| Company **count** | ~~48~~ → **49** | **49** | ✅ (docs corrected) |
 | Total rows | 192 | 192 | ✅ match |
 | Years present | 2022–2025 | 2022–2025 | ✅ match |
 | Sectors | Technology, Finance, Healthcare, Consumer, Energy | same 5 | ✅ match |
 
-**Mismatch 2 — company count is 48 everywhere in prose, but there are 49 companies.**
+**Mismatch 2 — prose said 48 everywhere, but there are 49 companies → ✅ RESOLVED.**
 
 - The dump contains **49 distinct companies**, and they match `prompt_spec.md`'s **enumerated
   list exactly** (set difference is empty both ways).
-- `prompt_spec.md`'s own enumerated list already contains **49 names** (Tech 15 + Finance 15 +
-  Healthcare 8 + Consumer 9 + Energy 2 = 49) — yet the same file's prose says "48 U.S. public
-  companies" (lines 28 & 82). **The spec contradicts itself**; reality (49) matches the list, not
-  the count.
-- The "48" figure also appears in the **system prompt** ("Coverage: 48 …"), the **tool
-  description**, `erd.md` §4, `CLAUDE.md`, and `README.md`.
+- `prompt_spec.md`'s own enumerated list already contained **49 names** (Tech 15 + Finance 15 +
+  Healthcare 8 + Consumer 9 + Energy 2 = 49) — yet the same file's prose said "48 U.S. public
+  companies." **The spec contradicted itself**; reality (49) matches the list, not the count.
+- The "48" figure also appeared in the **system prompt**, the **tool description**, `erd.md` §4,
+  `CLAUDE.md`, `README.md`, `compliance_requirements.md`, `functional_requirements.md`, and
+  `openapi_spec.yaml`.
 - **Row math:** 49 × 4 = 196 expected; two companies have only 2 of the 4 years —
   **BlackRock** (2022–2023 only) and **Shopify** (2024–2025 only) — so 196 − 4 = **192 rows**.
-  The "192" total is correct, but the docs' stated reasoning ("48 × 4 = 192") is coincidental and
+  The "192" total was correct, but the docs' stated reasoning ("48 × 4 = 192") was coincidental and
   wrong.
+- **Resolution:** all "48" occurrences corrected to **49**, and `erd.md` §4's row-math updated to
+  "49 × 4 − 4 = 192" with the BlackRock/Shopify explanation.
 
 Per-sector company counts in the dump:
 
@@ -90,26 +94,28 @@ Per-sector company counts in the dump:
 
 ## 3. Why Mismatch 2 matters (grounding accuracy)
 
-The system prompt hard-codes "Coverage: 48 U.S. public companies." Scenario S2 has the assistant
-tell users "My database covers **48** U.S. public companies." That statement would be **factually
-wrong** against the actual data (49). Because grounding/no-hallucination is a graded, non-cuttable
-requirement (FR-007, CR-003), this count should be corrected to **49** across all docs — but that
-is a docs change for the human to approve, not an agent auto-fix.
+The system prompt previously hard-coded "Coverage: 48 U.S. public companies," and Scenario S2 had
+the assistant tell users "My database covers **48** U.S. public companies" — **factually wrong**
+against the actual data (49). Because grounding/no-hallucination is a graded, non-cuttable
+requirement (FR-007, CR-003), the count was corrected to **49** across all docs (now applied).
 
-Also worth a human note: the two partial-coverage companies (**BlackRock** missing 2024–2025,
-**Shopify** missing 2022–2023) are real gaps in the data. The system prompt's NULL-handling rule
-covers NULL *columns*, but not *missing rows* for a year — the assistant should say "no data for
-that year" rather than imply the company doesn't exist.
+**⚠️ Still open (separate, not yet approved):** the two partial-coverage companies
+(**BlackRock** missing 2024–2025, **Shopify** missing 2022–2023) are real gaps in the data. The
+system prompt's NULL-handling rule covers NULL *columns*, but not *missing rows* for a year — the
+assistant should say "no data for that year" rather than imply the company doesn't exist. This
+system-prompt rule was **not** part of the approved fix and remains a pending decision.
 
 ---
 
-## 4. Recommendation (for human decision — not applied)
+## 4. Recommendation → outcome (human-approved 2026-07-07)
 
-1. Change "48" → "49" in: `prompt_spec.md` (§1 prose + system prompt + §2 tool description),
-   `erd.md` §4, `CLAUDE.md`, `README.md`.
-2. Fix the row-count explanation to "49 companies × 4 years − 4 missing (BlackRock 2×, Shopify 2×)
-   = 192."
-3. Decide whether to align the dump's `ticker`/`sector` to `VARCHAR(10)`/`VARCHAR(50)` via a
-   Phase-1 migration, or relax `erd.md` to `VARCHAR(255)` to match the provided dump. (Data fits
-   either way.)
-4. Optionally add the three documented indexes in the Phase-1 init/migration step.
+1. ✅ **Applied.** Changed "48" → "49" in: `prompt_spec.md` (§1 prose + system prompt + §2 tool
+   description + S2 example), `erd.md` §4 (+ row-math), `CLAUDE.md`, `README.md`,
+   `compliance_requirements.md`, `functional_requirements.md`, `openapi_spec.yaml`.
+2. ✅ **Applied.** Relaxed `erd.md` §4 `ticker`/`sector` to `VARCHAR(255)` to match the provided
+   dump (chosen over migrating the dump). Data fits either way; NOT-NULL intent retained.
+3. ⬜ **Open (not approved).** Add a missing-year rule to the system prompt for BlackRock
+   (2024–2025) and Shopify (2022–2023) — see §3.
+4. ⬜ **Optional / deferred to Phase 1.** Add the three documented indexes
+   (`idx_financial_company_year`, `idx_financial_sector`, `idx_financial_ticker`) in the init/
+   migration step.
