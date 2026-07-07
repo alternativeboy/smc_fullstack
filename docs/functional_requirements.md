@@ -58,7 +58,7 @@
 
 | ID | Description | Priority | Source Section | Status |
 |----|-------------|----------|----------------|--------|
-| FR-022 | PostgreSQL database loaded with financial_data.sql (48 companies, 2022-2025) | Critical | §4, §6 | `[ ]` |
+| FR-022 | PostgreSQL database loaded with financial_data.sql (49 companies, 2022-2025) | Critical | §4, §6 | `[ ]` |
 
 ---
 

@@ -7,7 +7,7 @@
 
 ## 📊 SOX (Sarbanes-Oxley Act)
 
-**Rationale**: The system displays financial data of publicly traded companies (48 companies, income-statement data).
+**Rationale**: The system displays financial data of publicly traded companies (49 companies, income-statement data).
 
 | ID | Regulation | Requirement Description | Implicit? | Priority | Status |
 |----|------------|------------------------|-----------|----------|--------|

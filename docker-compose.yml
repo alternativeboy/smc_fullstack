@@ -1,0 +1,12 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# PLACEHOLDER — built out in Phase 1 (Infra).
+#
+# Phase 1 will define:
+#   - postgres:15-alpine   → DB `financial_db`, loads data/financial_data.sql,
+#                            init script creates the SELECT-only `llm_reader` role
+#   - redis:7-alpine       → usage tracking + refresh-token store
+# See docs/architecture_overview.md §7 for the intended topology.
+#
+# Do NOT rely on this file yet — `docker compose up` is not expected to work
+# until Phase 1 is complete.
+# ─────────────────────────────────────────────────────────────────────────────

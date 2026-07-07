@@ -1,7 +1,7 @@
 # 💬 Financial Data Chat Assistant
 
 An AI-powered chat application where users ask natural-language questions about the
-income-statement data of **48 U.S. public companies (2022–2025)**. An LLM (OpenAI GPT-4o)
+income-statement data of **49 U.S. public companies (2022–2025)**. An LLM (OpenAI GPT-4o)
 answers **only** from a PostgreSQL database by generating SQL through a single `execute_sql`
 tool. Responses stream token-by-token, with authentication, per-user spending limits, and
 persistent conversation history.

@@ -25,7 +25,7 @@ Schema:
   - operating_income (BIGINT) — Operating income in USD (may be NULL)
   - gross_profit (BIGINT) — Gross profit in USD (may be NULL)
 
-Coverage: 48 U.S. public companies across 5 sectors, fiscal years 2022-2025 only.
+Coverage: 49 U.S. public companies across 5 sectors, fiscal years 2022-2025 only.
 Total rows: 192.
 
 ## Companies Available
@@ -79,7 +79,7 @@ Energy: Chevron, ExxonMobil
   "type": "function",
   "function": {
     "name": "execute_sql",
-    "description": "Execute a read-only SQL SELECT query against the financial_data table in PostgreSQL. The table contains income-statement data (company, ticker, sector, year, revenue, net_income, operating_income, gross_profit) for 48 U.S. public companies from 2022 to 2025. All monetary values are in USD (BIGINT). Some values may be NULL.",
+    "description": "Execute a read-only SQL SELECT query against the financial_data table in PostgreSQL. The table contains income-statement data (company, ticker, sector, year, revenue, net_income, operating_income, gross_profit) for 49 U.S. public companies from 2022 to 2025. All monetary values are in USD (BIGINT). Some values may be NULL.",
     "parameters": {
       "type": "object",
       "properties": {
@@ -501,7 +501,7 @@ SELECT * FROM financial_data WHERE company ILIKE '%Toyota%';
 
 **Tool Result:** `[]` (empty)
 
-**Assistant:** I don't have data for Toyota. My database covers **48 U.S. public companies** across 5 sectors (Technology, Finance, Healthcare, Consumer, Energy) for fiscal years **2022-2025** only.
+**Assistant:** I don't have data for Toyota. My database covers **49 U.S. public companies** across 5 sectors (Technology, Finance, Healthcare, Consumer, Energy) for fiscal years **2022-2025** only.
 
 If you're interested in automotive companies, I do have data for **Tesla**. Would you like to see Tesla's revenue instead?
 

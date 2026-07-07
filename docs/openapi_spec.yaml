@@ -4,7 +4,7 @@ info:
   description: |
     AI-powered financial data chat assistant API.
     A chat system that uses an LLM (OpenAI GPT-4o) to query financial data of
-    U.S. public companies via a SQL database (48 companies, 2022-2025).
+    U.S. public companies via a SQL database (49 companies, 2022-2025).
 
     ## Authentication model (CR-016)
     - The **access token** is short-lived (~15 min) and returned in the JSON body of

@@ -45,8 +45,8 @@ erDiagram
 
     FINANCIAL_DATA {
         varchar company "NOT NULL, max 255"
-        varchar ticker "NOT NULL, max 10"
-        varchar sector "NOT NULL, max 50"
+        varchar ticker "NOT NULL, max 255"
+        varchar sector "NOT NULL, max 255"
         integer year "NOT NULL"
         bigint revenue "NULLABLE"
         bigint net_income "NULLABLE"
@@ -164,8 +164,8 @@ erDiagram
 | Column | Type | Constraints | Notes |
 |--------|------|-------------|-------|
 | company | VARCHAR(255) | NOT NULL | e.g., "Apple", "JPMorgan" |
-| ticker | VARCHAR(10) | NOT NULL | e.g., "AAPL", "JPM" |
-| sector | VARCHAR(50) | NOT NULL | Technology, Finance, Healthcare, Consumer, Energy |
+| ticker | VARCHAR(255) | NOT NULL | e.g., "AAPL", "JPM" (matches provided dump) |
+| sector | VARCHAR(255) | NOT NULL | Technology, Finance, Healthcare, Consumer, Energy (matches provided dump) |
 | year | INTEGER | NOT NULL | 2022-2025 |
 | revenue | BIGINT | NULLABLE | USD |
 | net_income | BIGINT | NULLABLE | USD |
@@ -179,7 +179,8 @@ erDiagram
 
 **Notes:**
 - Loaded from `data/financial_data.sql` (pg_dump COPY format)
-- 48 companies × 4 years = 192 rows
+- 49 companies across fiscal years 2022–2025 = 192 rows (BlackRock has 2022–2023 only;
+  Shopify has 2024–2025 only, so 49 × 4 − 4 = 192)
 - **Read-only** — LLM queries run as a separate `llm_reader` DB user (Guardrail Layer 3)
 - Some columns are NULL for some companies (e.g., Goldman and Wells Fargo have no revenue)
 

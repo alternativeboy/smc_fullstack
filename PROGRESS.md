@@ -1,7 +1,7 @@
 # 📊 PROGRESS — Financial Data Chat Assistant
 
 > Single source of truth for project status. Read by both the human and the agent.
-> Last updated: 2026-07-07 · Updated by: — (no work sessions yet)
+> Last updated: 2026-07-07 · Updated by: assistant (Phase 0 session)
 
 ---
 
@@ -30,7 +30,7 @@
 
 | Phase | Scope | Status | Evidence (required for 🔍/✅) | Notes |
 |-------|-------|--------|-------------------------------|-------|
-| **0 — Ground truth** | Repo, `docs/`, `.env.example`, verify `financial_data.sql` matches `erd.md` | ⬜ | — | Schema check gates the system prompt |
+| **0 — Ground truth** | Repo, `docs/`, `.env.example`, verify `financial_data.sql` matches `erd.md` | ✅ | Root files created (.gitignore, README.md, docker-compose.yml placeholder, .env.example, data/); verification report `docs/phase0_ground_truth_report.md` | ✅ Both mismatches resolved (human-approved 2026-07-07): count 48→**49** across all docs; `ticker`/`sector` erd.md → VARCHAR(255) to match dump. Open (separate, not approved): missing-year system-prompt rule (BlackRock/Shopify). |
 | **1 — Infra** | Docker Compose (PG + Redis + init SQL + `llm_reader`), NestJS scaffold, Config, Health | ⬜ | — | DoD: `/api/health` green; `llm_reader` INSERT rejected |
 | **2 — Auth** | Register/login/refresh(rotation)/logout, bcrypt, JWT guard, throttler, httpOnly cookie, Redis token store | ⬜ | — | DoD: auth e2e incl. rotation + reuse detection |
 | **3 — Chat CRUD + isolation** | Entities + migrations, CRUD per OpenAPI, soft-delete, ownership → 404 | ⬜ | — | DoD: S6 e2e + cross-user isolation test |
@@ -162,6 +162,8 @@
 | 2026-07-07 | Streaming = `fetch()` + ReadableStream on POST (not EventSource) | POST + Bearer header required | docs/architecture_overview.md §4 |
 | 2026-07-07 | Token storage = access in memory + refresh in httpOnly cookie, Redis rotation | XSS containment, Bearer scheme preserved | docs/architecture_overview.md §3 |
 | 2026-07-07 | Refresh tokens stored in Redis (hashed), not a PG table | TTL alignment, no schema change | docs/erd.md |
+| 2026-07-07 | Company count corrected 48 → **49** across all docs | Dump has 49 companies; prompt_spec's own enumerated list was already 49 (prose was wrong) — grounding accuracy (S2) | docs/phase0_ground_truth_report.md |
+| 2026-07-07 | `financial_data.ticker`/`sector` = VARCHAR(255) (relaxed erd.md to match dump) | Chosen over migrating the provided dump; data fits either way | docs/phase0_ground_truth_report.md |
 
 ---
 
@@ -171,4 +173,6 @@
 
 | Date | Who | Phase | What happened | Blockers / follow-ups |
 |------|-----|-------|---------------|----------------------|
+| 2026-07-07 | assistant | 0 | Human approved both Phase-0 findings. Applied fixes: count 48→**49** in prompt_spec (§1/§2/S2), erd.md §4 (+row-math), CLAUDE.md, README.md, compliance_requirements.md, functional_requirements.md, openapi_spec.yaml; erd.md `ticker`/`sector` → VARCHAR(255) to match dump. Updated report + Decision Log. Verified no stray "48"/`VARCHAR(10)/(50)` remain. | Open (separate, not yet approved): add missing-year rule to system prompt (BlackRock 2024–25, Shopify 2022–23). Awaiting human to move Phase 0 🔍 → ✅ and commit. Did NOT start Phase 1. |
+| 2026-07-07 | assistant | 0 | Created root structure (.gitignore, README.md, docker-compose.yml placeholder, `.env.example`, `data/`). Human supplied `data/financial_data.sql`. Verified dump vs erd.md + prompt_spec → report at `docs/phase0_ground_truth_report.md`. Found 2 mismatches (docs NOT edited, per brief). | (resolved in the entry above) |
 | 2026-07-07 | human + assistant | pre-0 | Docs finalized in English; token & streaming decisions locked; CLAUDE.md + PROGRESS.md created | Start Phase 0 next |
