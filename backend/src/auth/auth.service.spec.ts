@@ -6,6 +6,7 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import * as bcrypt from 'bcrypt';
 import { AuthService } from './auth.service';
 import { User } from './entities/user.entity';
+import { RefreshTokenService } from './services/refresh-token.service';
 
 describe('AuthService', () => {
   let service: AuthService;
@@ -18,6 +19,11 @@ describe('AuthService', () => {
     get: jest.fn((k: string) => (k === 'BCRYPT_COST' ? 12 : undefined)),
     getOrThrow: jest.fn((k: string) => (k === 'BCRYPT_COST' ? 12 : undefined)),
   };
+  const refreshTokens = {
+    issue: jest.fn(async () => 'refresh.jwt.token'),
+    rotate: jest.fn(),
+    revoke: jest.fn(),
+  };
 
   beforeEach(async () => {
     jest.clearAllMocks();
@@ -27,6 +33,7 @@ describe('AuthService', () => {
         { provide: getRepositoryToken(User), useValue: repo },
         { provide: JwtService, useValue: jwt },
         { provide: ConfigService, useValue: config },
+        { provide: RefreshTokenService, useValue: refreshTokens },
       ],
     }).compile();
     service = moduleRef.get(AuthService);

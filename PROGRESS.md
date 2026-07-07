@@ -1,7 +1,7 @@
 # 📊 PROGRESS — Financial Data Chat Assistant
 
 > Single source of truth for project status. Read by both the human and the agent.
-> Last updated: 2026-07-07 · Updated by: assistant (Phase 2.2 session)
+> Last updated: 2026-07-07 · Updated by: assistant (Phase 2.3 session)
 
 ---
 
@@ -32,7 +32,7 @@
 |-------|-------|--------|-------------------------------|-------|
 | **0 — Ground truth** | Repo, `docs/`, `.env.example`, verify `financial_data.sql` matches `erd.md` | ✅ | Root files created (.gitignore, README.md, docker-compose.yml placeholder, .env.example, data/); verification report `docs/phase0_ground_truth_report.md` | ✅ Both mismatches resolved (human-approved 2026-07-07): count 48→**49** across all docs; `ticker`/`sector` erd.md → VARCHAR(255) to match dump. Open (separate, not approved): missing-year system-prompt rule (BlackRock/Shopify). |
 | **1 — Infra** | Docker Compose (PG + Redis + init SQL + `llm_reader`), NestJS scaffold, Config, Health | ✅ | **All DoD met.** Build: `nest build` clean; unit 5/5; app-level fail-fast (empty-env boot lists all 11 required vars). **Runtime (human-run w/ Docker 2026-07-07):** `docker compose ps` → both containers `healthy`; `SELECT count(*) FROM financial_data` → **192**; as `llm_reader` SELECT ok **and** INSERT → `permission denied for table financial_data`; `npm run test:e2e` → `Health (e2e)` passed (postgres+redis `up`). | Ready for human ✅ + commit. Fixed supertest default import in `health.e2e-spec.ts`. |
-| **2 — Auth** | Register/login/refresh(rotation)/logout, bcrypt, JWT guard, throttler, httpOnly cookie, Redis token store | 🚧 | **2.1 done (human-verified 2026-07-07):** `nest build` + migration `tsc` clean; `migration:run` created `users`; `\d users` matches erd.md (uuid `gen_random_uuid()`, email/password_hash/display_name, timestamps, deleted_at nullable, PK, unique `idx_users_email`); `migration:revert`+re-run clean; `llm_reader` SELECT on `users` → `permission denied`. **2.2 done (human-verified 2026-07-07):** build clean; unit 10/10 (auth: register, dup→409, login, wrong-pass→401, unknown→401); `test:e2e` green — register→201 (no `passwordHash` in body), login→200, `/auth/me` 200 w/ Bearer & 401 without/bad token, invalid body→400. | Sub-steps: **2.1 ✅** · **2.2 ✅** · 2.3 refresh rotation+reuse ⬜ · 2.4 throttler ⬜. Phase DoD: auth e2e incl. rotation + reuse detection. |
+| **2 — Auth** | Register/login/refresh(rotation)/logout, bcrypt, JWT guard, throttler, httpOnly cookie, Redis token store | 🚧 | **2.1 done (human-verified 2026-07-07):** `nest build` + migration `tsc` clean; `migration:run` created `users`; `\d users` matches erd.md (uuid `gen_random_uuid()`, email/password_hash/display_name, timestamps, deleted_at nullable, PK, unique `idx_users_email`); `migration:revert`+re-run clean; `llm_reader` SELECT on `users` → `permission denied`. **2.2 done (human-verified 2026-07-07):** build clean; unit 10/10 (auth: register, dup→409, login, wrong-pass→401, unknown→401); `test:e2e` green — register→201 (no `passwordHash` in body), login→200, `/auth/me` 200 w/ Bearer & 401 without/bad token, invalid body→400. **2.3 done (human-verified 2026-07-07):** unit 15/15 (refresh-token: issue-stores-hash, rotate single-use, reuse-revokes-family, invalid→401, revoke); `test:e2e` green — register/login set HttpOnly refresh cookie (no token in body); `/auth/refresh` rotates + new access token; **replay old cookie→401 AND latest cookie→401 (family revoked)**; logout clears cookie (Max-Age=0) + token dead. | Sub-steps: **2.1 ✅** · **2.2 ✅** · **2.3 ✅** · 2.4 throttler ⬜. Phase DoD: auth e2e incl. rotation + reuse detection. |
 | **3 — Chat CRUD + isolation** | Entities + migrations, CRUD per OpenAPI, soft-delete, ownership → 404 | ⬜ | — | DoD: S6 e2e + cross-user isolation test |
 | **4a — SQL guardrails** | `SqlValidatorService` + FinancialModule via `llm_reader` | ⬜ | — | DoD: attack-case unit tests pass (multi-stmt, comments, `pg_`, UNION) |
 | **4b — LLM streaming** | OpenAI stream + tool loop, SSE protocol, save message/cost/audit | ⬜ | — | DoD: S1 + S2 against real API |
@@ -120,7 +120,7 @@
 | CR-013 | Disclose data source & coverage | 4b | ⬜ |
 | CR-014 | OpenAI key never exposed | 1 | 🔍 |
 | CR-015 | Spend tracking within $10 budget | 5 | ⬜ |
-| CR-016 | Hybrid token storage + rotation | 2 | ⬜ |
+| CR-016 | Hybrid token storage + rotation | 2 | 🔍 |
 | CR-017 | CORS allowlist + credentials | 1 | 🔍 |
 
 ### Gaps (GAP)
@@ -169,6 +169,8 @@
 | 2026-07-07 | Env validation via **Joi** `validationSchema` in ConfigModule | Idiomatic fail-fast with @nestjs/config; BCRYPT_COST min 12 enforced at boot | backend/src/config/env.validation.ts |
 | 2026-07-07 | Added `GET /auth/me` to openapi_spec.yaml (docs-lead §8) | Exercises JwtAuthGuard in Phase 2 (no protected resource until Phase 3) + frontend session hydration | docs/openapi_spec.yaml, backend/src/auth/auth.controller.ts |
 | 2026-07-07 | Phase 2.2 register/login return access token in **body only** (no refresh cookie yet) | Temporary, scoped deviation from openapi; the httpOnly refresh cookie lands in Phase 2.3 and realigns the Set-Cookie contract | backend/src/auth/auth.controller.ts |
+| 2026-07-07 | Phase 2.3 realigns register/login/refresh with the openapi Set-Cookie contract (resolves the 2.2 deviation). No openapi edit needed. | `/auth/refresh` + `/auth/logout` already in spec; register/login's documented Set-Cookie now actually fires | backend/src/auth/auth.controller.ts, backend/src/auth/services/refresh-token.service.ts |
+| 2026-07-07 | Logout is cookie-driven, not JwtAuthGuard-protected | openapi security is OR (BearerAuth OR RefreshCookie); a user with an expired access token must still be able to clear their refresh cookie. Best-effort revoke + always clear cookie. | backend/src/auth/auth.controller.ts |
 
 ---
 
@@ -178,6 +180,7 @@
 
 | Date | Who | Phase | What happened | Blockers / follow-ups |
 |------|-----|-------|---------------|----------------------|
+| 2026-07-07 | human + assistant | 2.3 | Refresh rotation + cookie + logout + reuse detection: `auth/services/refresh-token.service.ts` (jti + sha256 hash in Redis `refresh:{userId}:{jti}`, single-use rotation, reuse→SCAN+DEL family, best-effort revoke). AuthService now issues refresh on register/login + `refresh()`/`logout()`. Controller sets/clears httpOnly refresh cookie (Secure/SameSite/Path from `app.cookie`, Max-Age=TTL); added `POST /auth/refresh` + `POST /auth/logout`; refresh token only in cookie, never in body. Verified: build clean, unit 15/15, human ran `test:e2e` → full rotation/reuse/logout flow green. On `feat/Phase2_Auth`. | 2.3 ✅ (CR-016 🔍). Realigned Set-Cookie contract (2.2 deviation resolved). Next: 2.4 (throttler → 429). Commit 2.3 when ready. |
 | 2026-07-07 | human + assistant | 2.2 | Register/login + access-token auth: RegisterDto/LoginDto (class-validator), AuthService (bcrypt cost from `getOrThrow('BCRYPT_COST')`, dup→409, bad creds→401, same 401 for unknown-email/wrong-pass), JwtStrategy + JwtAuthGuard + `@CurrentUser()`, AuthController (register/login/`GET /auth/me`), AuthModule wired. Added `/auth/me` to openapi first (§8). Fixed a `number\|undefined` config type via getOrThrow. Verified: build clean, unit 10/10, human ran `test:e2e` → Auth+Health green. On `feat/Phase2_Auth`. | 2.2 ✅. Refresh token/cookie deferred to 2.3 (temporary no-cookie deviation logged). Next: 2.3 (refresh rotation + reuse detection). Commit 2.2 when ready. |
 | 2026-07-07 | human + assistant | 2.1 | Users data layer: `common/entities/base.entity.ts`, `auth/entities/user.entity.ts` (password_hash select:false, soft-delete), migration `1783382400000-CreateUsers.ts` (native `gen_random_uuid()`). Assistant verified build + migration typecheck; human ran the stack: `migration:run` → `users` matches erd.md, `migration:revert`+re-run clean, `llm_reader` SELECT users → permission denied. On branch `feat/Phase2_Auth`. | 2.1 ✅. Next: 2.2 (register/login access-token auth). Commit 2.1 when ready. |
 | 2026-07-07 | human + assistant | 1 | **Runtime verification passed** (human ran Docker; assistant's sandbox couldn't). `docker compose up -d` pulled pg15/redis7, ran init scripts → both containers `healthy`; `financial_data` = **192** rows; `llm_reader` SELECT ok, INSERT → `permission denied` (Guardrail Layer 3 confirmed); `npm run test:e2e` green. Fixed a supertest namespace→default import in `health.e2e-spec.ts`. Phase 1 🚧→🔍. | Ready for human to move Phase 1 → ✅ and commit the boundary. Then Phase 2 (Auth). |

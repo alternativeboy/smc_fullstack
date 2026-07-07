@@ -1,31 +1,85 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Post, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Post,
+  Req,
+  Res,
+  UnauthorizedException,
+  UseGuards,
+} from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { CookieOptions, Request, Response } from 'express';
 import { AuthUser, CurrentUser } from '../common/decorators/current-user.decorator';
-import { AuthService } from './auth.service';
+import { AuthResult, AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 
+const REFRESH_COOKIE = 'refreshToken';
+
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly auth: AuthService) {}
+  constructor(
+    private readonly auth: AuthService,
+    private readonly config: ConfigService,
+  ) {}
 
-  // NOTE (Phase 2.2): register/login currently return the access token in the
-  // body only. The httpOnly refresh cookie is added in Phase 2.3, which realigns
-  // these responses with openapi (Set-Cookie header).
   @Post('register')
-  register(@Body() dto: RegisterDto) {
-    return this.auth.register(dto);
+  async register(@Body() dto: RegisterDto, @Res({ passthrough: true }) res: Response) {
+    return this.respond(res, await this.auth.register(dto));
   }
 
   @Post('login')
   @HttpCode(HttpStatus.OK)
-  login(@Body() dto: LoginDto) {
-    return this.auth.login(dto);
+  async login(@Body() dto: LoginDto, @Res({ passthrough: true }) res: Response) {
+    return this.respond(res, await this.auth.login(dto));
+  }
+
+  @Post('refresh')
+  @HttpCode(HttpStatus.OK)
+  async refresh(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
+    const presented = req.cookies?.[REFRESH_COOKIE];
+    if (!presented) {
+      throw new UnauthorizedException('Missing refresh token');
+    }
+    return this.respond(res, await this.auth.refresh(presented));
+  }
+
+  @Post('logout')
+  @HttpCode(HttpStatus.OK)
+  async logout(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
+    await this.auth.logout(req.cookies?.[REFRESH_COOKIE]);
+    res.clearCookie(REFRESH_COOKIE, this.cookieOptions());
   }
 
   @Get('me')
   @UseGuards(JwtAuthGuard)
   me(@CurrentUser() user: AuthUser): AuthUser {
     return user;
+  }
+
+  /** Set the refresh cookie and return the JSON body WITHOUT the refresh token. */
+  private respond(res: Response, result: AuthResult) {
+    const { refreshToken, ...body } = result;
+    const ttl = this.config.getOrThrow<number>('REFRESH_TOKEN_TTL');
+    res.cookie(REFRESH_COOKIE, refreshToken, { ...this.cookieOptions(), maxAge: ttl * 1000 });
+    return body;
+  }
+
+  private cookieOptions(): CookieOptions {
+    const cookie = this.config.getOrThrow<{
+      secure: boolean;
+      sameSite: 'strict' | 'lax' | 'none';
+      path: string;
+    }>('app.cookie');
+    return {
+      httpOnly: true,
+      secure: cookie.secure,
+      sameSite: cookie.sameSite,
+      path: cookie.path,
+    };
   }
 }
