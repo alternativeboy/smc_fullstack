@@ -1,7 +1,7 @@
 # 📊 PROGRESS — Financial Data Chat Assistant
 
 > Single source of truth for project status. Read by both the human and the agent.
-> Last updated: 2026-07-07 · Updated by: assistant (Phase 4a.1 session)
+> Last updated: 2026-07-07 · Updated by: assistant (Phase 4a.2 session)
 
 ---
 
@@ -34,13 +34,13 @@
 | **1 — Infra** | Docker Compose (PG + Redis + init SQL + `llm_reader`), NestJS scaffold, Config, Health | ✅ | **All DoD met.** Build: `nest build` clean; unit 5/5; app-level fail-fast (empty-env boot lists all 11 required vars). **Runtime (human-run w/ Docker 2026-07-07):** `docker compose ps` → both containers `healthy`; `SELECT count(*) FROM financial_data` → **192**; as `llm_reader` SELECT ok **and** INSERT → `permission denied for table financial_data`; `npm run test:e2e` → `Health (e2e)` passed (postgres+redis `up`). | Ready for human ✅ + commit. Fixed supertest default import in `health.e2e-spec.ts`. |
 | **2 — Auth** | Register/login/refresh(rotation)/logout, bcrypt, JWT guard, throttler, httpOnly cookie, Redis token store | ✅ | **2.1 done (human-verified 2026-07-07):** `nest build` + migration `tsc` clean; `migration:run` created `users`; `\d users` matches erd.md (uuid `gen_random_uuid()`, email/password_hash/display_name, timestamps, deleted_at nullable, PK, unique `idx_users_email`); `migration:revert`+re-run clean; `llm_reader` SELECT on `users` → `permission denied`. **2.2 done (human-verified 2026-07-07):** build clean; unit 10/10 (auth: register, dup→409, login, wrong-pass→401, unknown→401); `test:e2e` green — register→201 (no `passwordHash` in body), login→200, `/auth/me` 200 w/ Bearer & 401 without/bad token, invalid body→400. **2.3 done (human-verified 2026-07-07):** unit 15/15 (refresh-token: issue-stores-hash, rotate single-use, reuse-revokes-family, invalid→401, revoke); `test:e2e` green — register/login set HttpOnly refresh cookie (no token in body); `/auth/refresh` rotates + new access token; **replay old cookie→401 AND latest cookie→401 (family revoked)**; logout clears cookie (Max-Age=0) + token dead. **2.4 done (human-verified 2026-07-07):** @nestjs/throttler v6 on register/login from THROTTLE_TTL/LIMIT; curl 12× POST /auth/login → ten `401` then `429 429` (limit 10/60s); all three e2e suites still green with throttler active (e2e split per-file to isolate throttle counters). | Sub-steps: **2.1 ✅ · 2.2 ✅ · 2.3 ✅ · 2.4 ✅** — Phase 2 human-reviewed & signed off ✅ 2026-07-07. |
 | **3 — Chat CRUD + isolation** | Entities + migrations, CRUD per OpenAPI, soft-delete, ownership → 404 | 🔍 | **3.1 done (human-verified 2026-07-07):** `nest build` + migration `tsc` clean; `migration:run` created `conversations`/`messages`/`audit_logs`; `\d` on each matches erd.md (FKs: conversations→users CASCADE, messages→conversations CASCADE, audit_logs→users SET NULL; `numeric(10,6)` cost; soft-delete `deleted_at`; all indexes); `migration:revert`+re-run clean; `llm_reader` SELECT on all three → `permission denied`. **3.2 done (human-verified 2026-07-07):** build clean; unit 20/20 (chat: list scoping, getOne/getMessages/softDelete→404 on foreign id, owned delete); `test:e2e` green — CRUD (create 201 'New Chat' → paginated list → get empty messages → delete 200 {message} → gone + 404); **cross-user isolation: B gets 404 on A's conv for get/messages/delete, absent from B's list**; message ordering (seeded out-of-order → first/second/third, NFR-008). **3.3 done (human-verified 2026-07-07):** append-only AuditService (insert-only, unit-tested for no update/delete) + `@Audit` decorator + AuditInterceptor (logs on success only); delete route audited. unit 22/22; `test:e2e` S6 green — delete→200 → `delete_conversation` audit row (userId + metadata.messageCount=2) → conversation 404/hidden → **messages RETAINED** (soft-delete, no cascade); cross-user delete → 404 + NO audit row. | Sub-steps: **3.1 ✅ · 3.2 ✅ · 3.3 ✅** — Phase 3 complete, awaiting human ✅. |
-| **4a — SQL guardrails** | `SqlValidatorService` + FinancialModule via `llm_reader` | 🚧 | **4a.1 done (self-verified 2026-07-07, no DB):** `nest build` clean; `sql-validator.service.spec.ts` **41 tests green** (full suite 63/63). Blocks: all 14 keywords incl. mixed-case, stacked `;`, line/block comments, `pg_`/`pg_sleep`/`information_schema`, `users`/`conversations`/`messages`/`audit_logs` direct + via JOIN/UNION exfil, no-`financial_data` queries. Passes: CTE, aggregates, GROUP/ORDER BY, LIMIT, and blocked-words-in-string-literals (strengthening). | Sub-steps: **4a.1 ✅** · 4a.2 llm_reader exec + Layer-3 integration ⬜. Phase DoD: attack-case tests + Layer-3 rejection. |
+| **4a — SQL guardrails** | `SqlValidatorService` + FinancialModule via `llm_reader` | 🔍 | **4a.1 done (self-verified 2026-07-07, no DB):** `nest build` clean; `sql-validator.service.spec.ts` **41 tests green** (full suite 63/63). Blocks: all 14 keywords incl. mixed-case, stacked `;`, line/block comments, `pg_`/`pg_sleep`/`information_schema`, `users`/`conversations`/`messages`/`audit_logs` direct + via JOIN/UNION exfil, no-`financial_data` queries. Passes: CTE, aggregates, GROUP/ORDER BY, LIMIT, and blocked-words-in-string-literals (strengthening). **4a.2 done (human-verified 2026-07-07):** FinancialModule with a SECOND named `llm_reader` DataSource (statement_timeout 5s), FinancialData entity (read-only), FinancialService (Layer 2 validate → Layer 3 execute → 200-row cap + truncated). unit 66/66; `test:e2e` green — valid SELECT returns rows, cross-join capped at 200/truncated, **raw INSERT/UPDATE/DELETE via llm_reader → `permission denied` (Layer 3 independent of validator)**, `SELECT users` denied, `pg_sleep(10)` aborted by statement_timeout. | Sub-steps: **4a.1 ✅ · 4a.2 ✅** — Phase 4a complete, awaiting human ✅. |
 | **4b — LLM streaming** | OpenAI stream + tool loop, SSE protocol, save message/cost/audit | ⬜ | — | DoD: S1 + S2 against real API |
 | **5 — Usage + interruption** | Redis usage + guard, partial-save on abort | ⬜ | — | DoD: S3, S4, S5 (kill connection mid-stream for real) |
 | **6 — Frontend** | Auth pages, chat + `useStreamChat`, ToolCallWidget, Markdown/charts, sidebar, usage badge | ⬜ | — | DoD: human clicks through every scenario in a browser |
 | **7 — Polish** | README, full S1–S6 e2e, Helmet, audit review | ⬜ | — | README = 10% of grade |
 
-**Overall:** `3 / 9` phases done (Phase 0 ✅; Phase 1 ✅; Phase 2 ✅; Phase 3 🔍 — all sub-steps done, awaiting human sign-off)
+**Overall:** `3 / 9` phases done (Phase 0/1/2 ✅; Phase 3 🔍 + Phase 4a 🔍 — all sub-steps done, awaiting human sign-off)
 
 ---
 
@@ -103,7 +103,7 @@
 | NFR-008 | History in correct order | 3 | 🔍 |
 | NFR-009 | Extensible architecture | 1 | ✅ |
 | NFR-010 | Graceful error handling | 1, 4b | ⬜ |
-| NFR-011 | Input validation / SQL injection | 2, 4a | 🚧 |
+| NFR-011 | Input validation / SQL injection | 2, 4a | 🔍 |
 | NFR-012 | bcrypt password hashing | 2 | ✅ |
 | NFR-013 | API key via config | 1 | ✅ |
 | NFR-014 | Rate limiting | 2 | ✅ |
@@ -114,7 +114,7 @@
 |----|---------|-------|--------|
 | CR-001/003/012 | Financial data accuracy / grounding | 4a, 4b | ⬜ |
 | CR-002/018 | Append-only audit trail | 3, 4b | 🔍 |
-| CR-004 | Access control on financial queries | 2, 4a | ⬜ |
+| CR-004 | Access control on financial queries | 2, 4a | 🔍 |
 | CR-005–008 | PDPA (consent, disclosure, erasure, breach) | 2, 3, 7 | ⬜ |
 | CR-009–011 | GDPR (by design, erasure, portability) | 2, 3 | ⬜ |
 | CR-013 | Disclose data source & coverage | 4b | ⬜ |
@@ -127,10 +127,10 @@
 
 | ID | Summary | Phase | Status |
 |----|---------|-------|--------|
-| GAP-001 | SQL injection prevention | 4a | ⬜ |
+| GAP-001 | SQL injection prevention | 4a | 🔍 |
 | GAP-002 | Authentication | 2 | ✅ |
 | GAP-003 | Password storage | 2 | ✅ |
-| GAP-004 | Data accuracy verification | 4a | ⬜ |
+| GAP-004 | Data accuracy verification | 4a | 🔍 |
 | GAP-005 | OpenAI failure handling | 4b | ⬜ |
 | GAP-006 | API key management | 1 | ✅ |
 | GAP-007 | Auth rate limiting | 2 | ✅ |
@@ -184,7 +184,8 @@
 
 | Date | Who | Phase | What happened | Blockers / follow-ups |
 |------|-----|-------|---------------|----------------------|
-| 2026-07-07 | assistant | 4a.1 | SQL validator (Layer 2): `llm/services/sql-validator.service.ts` implementing the 6 prompt_spec rules, with string-literal-safe scanning (strengthening). 41 unit tests cover every attack case (keywords mixed-case, stacked stmts, comment bypass, pg_/system tables, app tables via JOIN/UNION exfil, no-financial_data) + legit passes (CTE/aggregates/ORDER/LIMIT) + blocked-words-as-string-data. **Fully self-verified (no DB): build clean + full suite 63/63.** On `feat/Phase4a` (branch tbd). | 4a.1 ✅ (agent self-verified). Decision-Log: proposed prompt_spec §3 update for the literal-blanking strengthening — human to review. Next: 4a.2 (llm_reader execution + Layer-3 integration). Commit 4a.1. |
+| 2026-07-07 | human + assistant | 4a.2 | Layer-3 execution: `financial/entities/financial-data.entity.ts` (read-only), second named `llm_reader` TypeORM DataSource (statement_timeout 5s, synchronize false), `financial.service.ts` (validate→execute→200-row cap+truncated), FinancialModule provides/exports SqlValidatorService (no circular dep) wired into AppModule. Verified: build clean, unit 66/66, human ran `test:e2e` → llm_reader SELECT ok, cross-join capped 200, **raw INSERT/UPDATE/DELETE → permission denied (Layer 3 independent)**, users denied, pg_sleep aborted by timeout. **Phase 4a complete → 🔍 overall.** On `feat/Phase4a_SQL_Guardrails`. | 4a.2 ✅ (GAP-001/004, NFR-011, CR-004 🔍). Awaiting human review of Phase 4a → ✅. Next: prompt_spec §3 update (literal-blanking) + missing-year rule, then Phase 4b (LLM streaming). |
+| 2026-07-07 | assistant | 4a.1 | SQL validator (Layer 2): `llm/services/sql-validator.service.ts` implementing the 6 prompt_spec rules, with string-literal-safe scanning (strengthening). 41 unit tests cover every attack case (keywords mixed-case, stacked stmts, comment bypass, pg_/system tables, app tables via JOIN/UNION exfil, no-financial_data) + legit passes (CTE/aggregates/ORDER/LIMIT) + blocked-words-as-string-data. **Fully self-verified (no DB): build clean + full suite 63/63.** On `feat/Phase4a_SQL_Guardrails`. | 4a.1 ✅ (agent self-verified). Decision-Log: proposed prompt_spec §3 update for the literal-blanking strengthening — human to review. Next: 4a.2 (llm_reader execution + Layer-3 integration). Commit 4a.1. |
 | 2026-07-07 | human + assistant | 3.3 | Audit + S6: append-only `common/services/audit.service.ts` (insert-only), `@Audit` decorator + `audit.interceptor.ts` (success-only), global `common.module.ts`; DELETE audited with metadata {conversationId, messageCount}. Reconciled S6 to soft-delete (messages retained, not cascade-removed). Fixed a TypeORM jsonb insert typing (localized cast). Verified: build clean, unit 22/22, human ran `test:e2e` → S6 green (audit row, 404/hidden, messages retained; cross-user 404 + no audit). **Phase 3 complete → 🔍 overall.** On `feat/Phase3_Chat_CRUD_Isolation`. | 3.3 ✅ (S6, FR-019, GAP-008, CR-002/018 🔍). Awaiting human review of Phase 3 → ✅. Next: Phase 4a (SQL guardrails). |
 | 2026-07-07 | human + assistant | 3.2 | Conversation CRUD + isolation: ChatModule (service scopes every query by user_id via `findOwned` → 404; soft-delete via softRemove; list paginated updated_at DESC; messages ordered created_at ASC), ChatController (JWT-guarded, ParseUUIDPipe, delete 200 {message} per spec), wired into AppModule. Verified: build clean, unit 20/20, human ran `test:e2e` → CRUD + **cross-user 404 isolation (FR-014)** + message ordering (NFR-008) green. On `feat/Phase3_Chat_CRUD_Isolation`. | 3.2 ✅ (FR-014, FR-018, NFR-008 → 🔍; FR-001, FR-019 partial 🚧). Next: 3.3 (audit + S6 — soft-delete reconciliation). Commit 3.2. |
 | 2026-07-07 | human + assistant | 3.1 | Chat data layer: `chat/entities/conversation.entity.ts` (soft-delete, user FK), `chat/entities/message.entity.ts` (created_at only, no updated_at, numeric cost), `common/entities/audit-log.entity.ts` (append-only, nullable user), migration `1783468800000-CreateChatTables.ts` (3 tables + indexes + FKs). Assistant verified build + migration typecheck; human ran the stack: `migration:run` → all three tables match erd.md, `migration:revert`+re-run clean, `llm_reader` denied on all three. On `feat/Phase3_Chat_CRUD_Isolation`. | 3.1 ✅. Next: 3.2 (conversation CRUD + isolation→404). Commit 3.1. Note for 3.3: reconcile soft-delete vs the architecture-doc S6 "cascade-removed" (soft-delete wins). |
