@@ -1,7 +1,7 @@
 # 📊 PROGRESS — Financial Data Chat Assistant
 
 > Single source of truth for project status. Read by both the human and the agent.
-> Last updated: 2026-07-07 · Updated by: assistant (Phase 2.1 session)
+> Last updated: 2026-07-07 · Updated by: assistant (Phase 2.2 session)
 
 ---
 
@@ -32,7 +32,7 @@
 |-------|-------|--------|-------------------------------|-------|
 | **0 — Ground truth** | Repo, `docs/`, `.env.example`, verify `financial_data.sql` matches `erd.md` | ✅ | Root files created (.gitignore, README.md, docker-compose.yml placeholder, .env.example, data/); verification report `docs/phase0_ground_truth_report.md` | ✅ Both mismatches resolved (human-approved 2026-07-07): count 48→**49** across all docs; `ticker`/`sector` erd.md → VARCHAR(255) to match dump. Open (separate, not approved): missing-year system-prompt rule (BlackRock/Shopify). |
 | **1 — Infra** | Docker Compose (PG + Redis + init SQL + `llm_reader`), NestJS scaffold, Config, Health | ✅ | **All DoD met.** Build: `nest build` clean; unit 5/5; app-level fail-fast (empty-env boot lists all 11 required vars). **Runtime (human-run w/ Docker 2026-07-07):** `docker compose ps` → both containers `healthy`; `SELECT count(*) FROM financial_data` → **192**; as `llm_reader` SELECT ok **and** INSERT → `permission denied for table financial_data`; `npm run test:e2e` → `Health (e2e)` passed (postgres+redis `up`). | Ready for human ✅ + commit. Fixed supertest default import in `health.e2e-spec.ts`. |
-| **2 — Auth** | Register/login/refresh(rotation)/logout, bcrypt, JWT guard, throttler, httpOnly cookie, Redis token store | 🚧 | **2.1 done (human-verified 2026-07-07):** `nest build` + migration `tsc` clean; `migration:run` created `users`; `\d users` matches erd.md (uuid `gen_random_uuid()`, email/password_hash/display_name, timestamps, deleted_at nullable, PK, unique `idx_users_email`); `migration:revert`+re-run clean; `llm_reader` SELECT on `users` → `permission denied`. | Sub-steps: **2.1 ✅** · 2.2 register/login ⬜ · 2.3 refresh rotation+reuse ⬜ · 2.4 throttler ⬜. Phase DoD: auth e2e incl. rotation + reuse detection. |
+| **2 — Auth** | Register/login/refresh(rotation)/logout, bcrypt, JWT guard, throttler, httpOnly cookie, Redis token store | 🚧 | **2.1 done (human-verified 2026-07-07):** `nest build` + migration `tsc` clean; `migration:run` created `users`; `\d users` matches erd.md (uuid `gen_random_uuid()`, email/password_hash/display_name, timestamps, deleted_at nullable, PK, unique `idx_users_email`); `migration:revert`+re-run clean; `llm_reader` SELECT on `users` → `permission denied`. **2.2 done (human-verified 2026-07-07):** build clean; unit 10/10 (auth: register, dup→409, login, wrong-pass→401, unknown→401); `test:e2e` green — register→201 (no `passwordHash` in body), login→200, `/auth/me` 200 w/ Bearer & 401 without/bad token, invalid body→400. | Sub-steps: **2.1 ✅** · **2.2 ✅** · 2.3 refresh rotation+reuse ⬜ · 2.4 throttler ⬜. Phase DoD: auth e2e incl. rotation + reuse detection. |
 | **3 — Chat CRUD + isolation** | Entities + migrations, CRUD per OpenAPI, soft-delete, ownership → 404 | ⬜ | — | DoD: S6 e2e + cross-user isolation test |
 | **4a — SQL guardrails** | `SqlValidatorService` + FinancialModule via `llm_reader` | ⬜ | — | DoD: attack-case unit tests pass (multi-stmt, comments, `pg_`, UNION) |
 | **4b — LLM streaming** | OpenAI stream + tool loop, SSE protocol, save message/cost/audit | ⬜ | — | DoD: S1 + S2 against real API |
@@ -77,8 +77,8 @@
 | FR-009 | Spending limit per user (default $1) | 5 | ⬜ |
 | FR-010 | Limit reset on fixed interval | 5 | ⬜ |
 | FR-011 | Configurable limit & interval | 5 | ⬜ |
-| FR-012 | User registration | 2 | ⬜ |
-| FR-013 | User login | 2 | ⬜ |
+| FR-012 | User registration | 2 | 🔍 |
+| FR-013 | User login | 2 | 🔍 |
 | FR-014 | User isolation | 3 | ⬜ |
 | FR-015 | Stop mid-generation | 5 | ⬜ |
 | FR-016 | Partial message saved | 5 | ⬜ |
@@ -103,8 +103,8 @@
 | NFR-008 | History in correct order | 3 | ⬜ |
 | NFR-009 | Extensible architecture | 1 | 🔍 |
 | NFR-010 | Graceful error handling | 1, 4b | ⬜ |
-| NFR-011 | Input validation / SQL injection | 2, 4a | ⬜ |
-| NFR-012 | bcrypt password hashing | 2 | ⬜ |
+| NFR-011 | Input validation / SQL injection | 2, 4a | 🚧 |
+| NFR-012 | bcrypt password hashing | 2 | 🔍 |
 | NFR-013 | API key via config | 1 | 🔍 |
 | NFR-014 | Rate limiting | 2 | ⬜ |
 
@@ -128,8 +128,8 @@
 | ID | Summary | Phase | Status |
 |----|---------|-------|--------|
 | GAP-001 | SQL injection prevention | 4a | ⬜ |
-| GAP-002 | Authentication | 2 | ⬜ |
-| GAP-003 | Password storage | 2 | ⬜ |
+| GAP-002 | Authentication | 2 | 🔍 |
+| GAP-003 | Password storage | 2 | 🔍 |
 | GAP-004 | Data accuracy verification | 4a | ⬜ |
 | GAP-005 | OpenAI failure handling | 4b | ⬜ |
 | GAP-006 | API key management | 1 | 🔍 |
@@ -167,6 +167,8 @@
 | 2026-07-07 | Single **root `.env`** as the source of truth (not backend/.env) | Compose interpolation + Nest ConfigModule read the same file; Nest `envFilePath: ['.env','../.env']`. Deviates from folder_structure.md's `backend/.env` note. | backend/src/config/config.module.ts |
 | 2026-07-07 | Added a small global `RedisModule` (ioredis client) not in folder_structure.md | Health check needs a Redis client now; usage/auth reuse it later. Terminus has no built-in Redis indicator → custom `RedisHealthIndicator`. | backend/src/redis/ |
 | 2026-07-07 | Env validation via **Joi** `validationSchema` in ConfigModule | Idiomatic fail-fast with @nestjs/config; BCRYPT_COST min 12 enforced at boot | backend/src/config/env.validation.ts |
+| 2026-07-07 | Added `GET /auth/me` to openapi_spec.yaml (docs-lead §8) | Exercises JwtAuthGuard in Phase 2 (no protected resource until Phase 3) + frontend session hydration | docs/openapi_spec.yaml, backend/src/auth/auth.controller.ts |
+| 2026-07-07 | Phase 2.2 register/login return access token in **body only** (no refresh cookie yet) | Temporary, scoped deviation from openapi; the httpOnly refresh cookie lands in Phase 2.3 and realigns the Set-Cookie contract | backend/src/auth/auth.controller.ts |
 
 ---
 
@@ -176,6 +178,7 @@
 
 | Date | Who | Phase | What happened | Blockers / follow-ups |
 |------|-----|-------|---------------|----------------------|
+| 2026-07-07 | human + assistant | 2.2 | Register/login + access-token auth: RegisterDto/LoginDto (class-validator), AuthService (bcrypt cost from `getOrThrow('BCRYPT_COST')`, dup→409, bad creds→401, same 401 for unknown-email/wrong-pass), JwtStrategy + JwtAuthGuard + `@CurrentUser()`, AuthController (register/login/`GET /auth/me`), AuthModule wired. Added `/auth/me` to openapi first (§8). Fixed a `number\|undefined` config type via getOrThrow. Verified: build clean, unit 10/10, human ran `test:e2e` → Auth+Health green. On `feat/Phase2_Auth`. | 2.2 ✅. Refresh token/cookie deferred to 2.3 (temporary no-cookie deviation logged). Next: 2.3 (refresh rotation + reuse detection). Commit 2.2 when ready. |
 | 2026-07-07 | human + assistant | 2.1 | Users data layer: `common/entities/base.entity.ts`, `auth/entities/user.entity.ts` (password_hash select:false, soft-delete), migration `1783382400000-CreateUsers.ts` (native `gen_random_uuid()`). Assistant verified build + migration typecheck; human ran the stack: `migration:run` → `users` matches erd.md, `migration:revert`+re-run clean, `llm_reader` SELECT users → permission denied. On branch `feat/Phase2_Auth`. | 2.1 ✅. Next: 2.2 (register/login access-token auth). Commit 2.1 when ready. |
 | 2026-07-07 | human + assistant | 1 | **Runtime verification passed** (human ran Docker; assistant's sandbox couldn't). `docker compose up -d` pulled pg15/redis7, ran init scripts → both containers `healthy`; `financial_data` = **192** rows; `llm_reader` SELECT ok, INSERT → `permission denied` (Guardrail Layer 3 confirmed); `npm run test:e2e` green. Fixed a supertest namespace→default import in `health.e2e-spec.ts`. Phase 1 🚧→🔍. | Ready for human to move Phase 1 → ✅ and commit the boundary. Then Phase 2 (Auth). |
 | 2026-07-07 | assistant | 1 | Built infra: docker-compose.yml (postgres:15 + redis:7, healthchecks) + init scripts `docker/postgres/02-indexes.sql` (3 erd indexes) & `03-llm-reader.sh` (SELECT-only role + ALTER DEFAULT PRIVILEGES safeguard). Scaffolded NestJS backend/ (ConfigModule+Joi validation, TypeOrmModule forRootAsync `synchronize:false`, global RedisModule, HealthModule w/ custom Redis indicator, main.ts global `/api` prefix + ValidationPipe + cookie-parser + CORS allowlist credentials:true). Added TypeORM CLI data-source + migration scripts. Verified: `npm install`, `nest build` clean, `npm test` 5/5, empty-env boot → fail-fast, compose YAML + `sh -n` valid. | **⛔ Docker not installed in this env** — runtime DoD unverified. Human must run: `cp .env.example .env` (set real OPENAI_API_KEY/secrets) → `docker compose up -d` → `docker exec smc_postgres psql -U postgres -d financial_db -c "SELECT count(*) FROM financial_data;"` (expect 192) → `cd backend && npm run start:dev` → `curl localhost:3000/api/health` (expect 200 ok) → `PGPASSWORD=<llm pass> psql -h localhost -U llm_reader -d financial_db -c "INSERT INTO financial_data VALUES('x','x','x',2022,0,0,0,0);"` (expect: permission denied) → `npm run test:e2e`. Then move 🚧→🔍/✅ and commit. **Not committed** (unverified phase). Did NOT start Phase 2. |
