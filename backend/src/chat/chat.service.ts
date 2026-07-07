@@ -74,10 +74,13 @@ export class ChatService {
     return (await this.orderedMessages(id)).map(toMessage);
   }
 
-  async softDelete(userId: string, id: string): Promise<{ message: string }> {
+  async softDelete(userId: string, id: string): Promise<{ message: string; messageCount: number }> {
     const conversation = await this.findOwned(userId, id);
+    // Count before soft-remove for the audit metadata; messages are RETAINED
+    // (soft-delete keeps history — the conversation is just hidden).
+    const messageCount = await this.messages.count({ where: { conversationId: id } });
     await this.conversations.softRemove(conversation);
-    return { message: 'Conversation deleted successfully' };
+    return { message: 'Conversation deleted successfully', messageCount };
   }
 
   /**

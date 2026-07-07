@@ -6,12 +6,19 @@ import {
   ParseUUIDPipe,
   Post,
   Query,
+  Req,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
-import { AuthUser, CurrentUser } from '../common/decorators/current-user.decorator';
+import { Request } from 'express';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { Audit } from '../common/decorators/audit.decorator';
+import { AuthUser, CurrentUser } from '../common/decorators/current-user.decorator';
+import { AuditInterceptor } from '../common/interceptors/audit.interceptor';
 import { ChatService } from './chat.service';
 import { ListConversationsQueryDto } from './dto/list-conversations.query.dto';
+
+type AuditableRequest = Request & { auditMetadata?: Record<string, unknown> };
 
 @Controller('conversations')
 @UseGuards(JwtAuthGuard)
@@ -39,7 +46,17 @@ export class ChatController {
   }
 
   @Delete(':id')
-  remove(@CurrentUser() user: AuthUser, @Param('id', ParseUUIDPipe) id: string) {
-    return this.chat.softDelete(user.id, id);
+  @UseInterceptors(AuditInterceptor)
+  @Audit('delete_conversation', 'conversation')
+  async remove(
+    @CurrentUser() user: AuthUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Req() req: AuditableRequest,
+  ) {
+    // Ownership is enforced in the service: a foreign id throws 404 here, so the
+    // interceptor's success tap never fires → no audit row for a failed delete.
+    const { message, messageCount } = await this.chat.softDelete(user.id, id);
+    req.auditMetadata = { conversationId: id, messageCount };
+    return { message };
   }
 }

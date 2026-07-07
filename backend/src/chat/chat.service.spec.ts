@@ -14,7 +14,7 @@ describe('ChatService (FR-014 ownership scoping)', () => {
     save: jest.fn(),
     softRemove: jest.fn(),
   };
-  const messages = { find: jest.fn() };
+  const messages = { find: jest.fn(), count: jest.fn() };
 
   beforeEach(async () => {
     jest.clearAllMocks();
@@ -58,11 +58,12 @@ describe('ChatService (FR-014 ownership scoping)', () => {
     expect(conversations.softRemove).not.toHaveBeenCalled();
   });
 
-  it('softDelete removes an owned conversation and returns the message', async () => {
+  it('softDelete removes an owned conversation and returns message + messageCount', async () => {
     const conv = { id: 'c1', userId: 'user-1' };
     conversations.findOne.mockResolvedValue(conv);
+    messages.count.mockResolvedValue(3);
     const res = await service.softDelete('user-1', 'c1');
     expect(conversations.softRemove).toHaveBeenCalledWith(conv);
-    expect(res).toEqual({ message: 'Conversation deleted successfully' });
+    expect(res).toEqual({ message: 'Conversation deleted successfully', messageCount: 3 });
   });
 });
