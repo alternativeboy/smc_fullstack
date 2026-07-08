@@ -59,6 +59,7 @@
 | ID | Description | Priority | Source Section | Status |
 |----|-------------|----------|----------------|--------|
 | FR-022 | PostgreSQL database loaded with financial_data.sql (49 companies, 2022-2025) | Critical | §4, §6 | `[ ]` |
+| FR-023 | System prompt coverage (company list, sectors, year range) reflects the current `financial_data` contents at application startup; a schema guard fails loudly on column drift | High | derived (post-v1) | `[ ]` |
 
 ---
 

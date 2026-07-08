@@ -110,6 +110,45 @@ Open **http://localhost:5173**, register an account, and start chatting. (The fr
 
 ---
 
+## 🔄 Updating the financial data (Level-1)
+
+The dataset is loaded once when the Postgres volume is first created (init `01-financial-data.sql`).
+To load a **new** data set of the **same shape** (same 8 columns — just new companies/years/rows):
+
+**Option A — replace everything**
+```sql
+-- psql into the running container, then:
+TRUNCATE financial_data;
+\i /path/to/new_financial_data.sql   -- or COPY / INSERTs for the new rows
+```
+
+**Option B — append / upsert new rows** (keep existing, add or update)
+```sql
+INSERT INTO financial_data (company, ticker, sector, year, revenue, net_income, operating_income, gross_profit)
+VALUES (...)
+ON CONFLICT (company, year) DO UPDATE SET
+  revenue = EXCLUDED.revenue, net_income = EXCLUDED.net_income,
+  operating_income = EXCLUDED.operating_income, gross_profit = EXCLUDED.gross_profit;
+```
+Use **A** to swap datasets wholesale; **B** to extend the current one (e.g. add a new fiscal year).
+
+**Then restart the backend.** The system prompt's coverage (company list, sectors, year range) is
+generated **at startup** from the DB (**FR-023**), so a restart is what makes the assistant aware of
+the new companies/years. There is no cache to clear and no refresh endpoint — restart *is* the
+refresh (local scope). You'll see the new coverage summary in the boot log:
+`System-prompt coverage: N companies, M sectors, years YYYY-YYYY (T rows).`
+
+> **Same-schema only.** The new file **must** keep the exact columns above. Changing/renaming a
+> column is a **code** change, not a data load — it needs the SQL-validator allowlist, the
+> `llm_reader` GRANT, and the prompt updated together. The **startup schema guard** enforces this:
+> if `financial_data`'s columns drift, the backend **refuses to start** and names the offending
+> column(s).
+>
+> *Note:* replacing data can make figures quoted in **old conversations** no longer match the DB
+> (historical transcripts aren't rewritten). No action needed for local use.
+
+---
+
 ## 🔧 Environment Variables
 
 Derived from [`.env.example`](.env.example). Defaults shown work with local Docker.
