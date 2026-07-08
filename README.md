@@ -13,7 +13,7 @@ persistent conversation history.
 
 ## 🚦 Build status
 
-Backend is built in verifiable phases (see [`PROGRESS.md`](PROGRESS.md)). **7 / 9 phases done — backend feature-complete.**
+Built in verifiable phases (see [`PROGRESS.md`](PROGRESS.md)). **7 / 9 done; Phase 6 (frontend) 🔍 — S1–S6 verified end-to-end in the browser.** Only Phase 7 (polish) remains.
 
 | Phase | Scope | Status |
 |-------|-------|--------|
@@ -24,7 +24,7 @@ Backend is built in verifiable phases (see [`PROGRESS.md`](PROGRESS.md)). **7 / 
 | 4a | SQL guardrails — validator (Layer 2) + `llm_reader` execution (Layer 3) | ✅ |
 | 4b | LLM streaming — OpenAI + `execute_sql` tool loop + SSE (grounding verified live on gpt-4o) | ✅ |
 | 5 | Usage limits + interruption (partial-save) | ✅ |
-| 6 | Frontend (React) | ⬜ |
+| 6 | Frontend (React) — auth, streaming chat, SQL widget, tables/charts, sidebar, usage | 🔍 (S1–S6 browser-verified) |
 | 7 | Polish | ⬜ |
 
 The full backend answer pipeline (auth, isolation, audit, both SQL guardrail layers, and grounded
