@@ -1,26 +1,40 @@
 import { cn } from '@/lib/utils';
 import type { ChatMessage as ChatMessageType } from '@/types/chat.types';
+import { MarkdownRenderer } from './MarkdownRenderer';
+import { ResultChart } from './ResultChart';
 import { StreamingIndicator } from './StreamingIndicator';
+import { ToolCallWidget } from './ToolCallWidget';
 
 export function ChatMessage({ message }: { message: ChatMessageType }) {
   const isUser = message.role === 'user';
+
   return (
     <div className={cn('flex', isUser ? 'justify-end' : 'justify-start')}>
       <div
         className={cn(
           'max-w-[85%] rounded-lg px-4 py-2 text-sm',
-          isUser ? 'bg-primary text-primary-foreground' : 'bg-muted text-foreground',
+          isUser ? 'bg-primary text-primary-foreground' : 'w-full bg-muted text-foreground',
         )}
       >
-        {/* Tool call stub — the collapsible ToolCallWidget lands in Phase 6.3. */}
+        {/* FR-005 — the SQL tool call is visible while it runs. */}
         {message.toolCalls?.map((tc, i) => (
-          <pre key={i} className="mb-2 overflow-x-auto rounded bg-background/60 p-2 text-xs">
-            🔧 {tc.arguments}
-            {message.toolResults?.[i] ? `  →  ${message.toolResults[i].rowCount} row(s)` : ''}
-          </pre>
+          <ToolCallWidget
+            key={i}
+            toolCall={tc}
+            toolResult={message.toolResults?.[i]}
+            running={message.streaming && !message.toolResults?.[i]}
+          />
         ))}
 
-        {message.content && <div className="whitespace-pre-wrap">{message.content}</div>}
+        {isUser
+          ? message.content && <div className="whitespace-pre-wrap">{message.content}</div>
+          : message.content && (
+              <>
+                <ResultChart content={message.content} />
+                <MarkdownRenderer content={message.content} />
+              </>
+            )}
+
         {message.streaming && <StreamingIndicator />}
 
         {message.isPartial && (
