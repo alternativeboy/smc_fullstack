@@ -1,7 +1,7 @@
 import { BadRequestException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { EXECUTE_SQL_TOOL } from './constants/tool-definitions';
-import { SYSTEM_PROMPT } from './constants/system-prompt';
+import { SYSTEM_PROMPT_TEMPLATE } from './constants/system-prompt';
 import { LlmService } from './llm.service';
 import { OutputValidatorService } from './services/output-validator.service';
 import { PromptBuilderService } from './services/prompt-builder.service';
@@ -49,7 +49,7 @@ function makeService(financialExecute: jest.Mock) {
   const service = new LlmService(
     openai,
     config,
-    new PromptBuilderService(),
+    new PromptBuilderService({ query: jest.fn() } as any),
     financial,
     new OutputValidatorService(),
   );
@@ -112,11 +112,11 @@ describe('LlmService (tool loop, mocked OpenAI)', () => {
 
 describe('verbatim prompt/tool constants', () => {
   it('system prompt matches the spec (key invariants)', () => {
-    expect(SYSTEM_PROMPT).toContain('49 U.S. public companies');
-    expect(SYSTEM_PROMPT).toContain('financial_data');
-    expect(SYSTEM_PROMPT).toContain('SELECT only');
-    expect(SYSTEM_PROMPT).toContain('NO HALLUCINATION');
-    expect(SYSTEM_PROMPT).toContain('BlackRock has no 2024-2025 data');
+    expect(SYSTEM_PROMPT_TEMPLATE).toContain('{{COVERAGE_BLOCK}}'); // filled from DB at boot
+    expect(SYSTEM_PROMPT_TEMPLATE).toContain('financial_data');
+    expect(SYSTEM_PROMPT_TEMPLATE).toContain('SELECT only');
+    expect(SYSTEM_PROMPT_TEMPLATE).toContain('NO HALLUCINATION');
+    expect(SYSTEM_PROMPT_TEMPLATE).toContain('BlackRock has no 2024-2025 data');
   });
 
   it('execute_sql tool is defined correctly', () => {
