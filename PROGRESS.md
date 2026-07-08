@@ -1,7 +1,7 @@
 # 📊 PROGRESS — Financial Data Chat Assistant
 
 > Single source of truth for project status. Read by both the human and the agent.
-> Last updated: 2026-07-08 · Updated by: assistant (Phase 4b.2 session)
+> Last updated: 2026-07-08 · Updated by: human (Phase 4b sign-off)
 
 ---
 
@@ -30,17 +30,17 @@
 
 | Phase | Scope | Status | Evidence (required for 🔍/✅) | Notes |
 |-------|-------|--------|-------------------------------|-------|
-| **0 — Ground truth** | Repo, `docs/`, `.env.example`, verify `financial_data.sql` matches `erd.md` | ✅ | Root files created (.gitignore, README.md, docker-compose.yml placeholder, .env.example, data/); verification report `docs/phase0_ground_truth_report.md` | ✅ Both mismatches resolved (human-approved 2026-07-07): count 48→**49** across all docs; `ticker`/`sector` erd.md → VARCHAR(255) to match dump. Open (separate, not approved): missing-year system-prompt rule (BlackRock/Shopify). |
+| **0 — Ground truth** | Repo, `docs/`, `.env.example`, verify `financial_data.sql` matches `erd.md` | ✅ | Root files created (.gitignore, README.md, docker-compose.yml placeholder, .env.example, data/); verification report `docs/phase0_ground_truth_report.md` | ✅ Both mismatches resolved (human-approved 2026-07-07): count 48→**49** across all docs; `ticker`/`sector` erd.md → VARCHAR(255) to match dump. ~~Open: missing-year system-prompt rule (BlackRock/Shopify)~~ → resolved 2026-07-08 (added to prompt_spec §1 in Phase 4b.1, verified live in 4b.3). |
 | **1 — Infra** | Docker Compose (PG + Redis + init SQL + `llm_reader`), NestJS scaffold, Config, Health | ✅ | **All DoD met.** Build: `nest build` clean; unit 5/5; app-level fail-fast (empty-env boot lists all 11 required vars). **Runtime (human-run w/ Docker 2026-07-07):** `docker compose ps` → both containers `healthy`; `SELECT count(*) FROM financial_data` → **192**; as `llm_reader` SELECT ok **and** INSERT → `permission denied for table financial_data`; `npm run test:e2e` → `Health (e2e)` passed (postgres+redis `up`). | Ready for human ✅ + commit. Fixed supertest default import in `health.e2e-spec.ts`. |
 | **2 — Auth** | Register/login/refresh(rotation)/logout, bcrypt, JWT guard, throttler, httpOnly cookie, Redis token store | ✅ | **2.1 done (human-verified 2026-07-07):** `nest build` + migration `tsc` clean; `migration:run` created `users`; `\d users` matches erd.md (uuid `gen_random_uuid()`, email/password_hash/display_name, timestamps, deleted_at nullable, PK, unique `idx_users_email`); `migration:revert`+re-run clean; `llm_reader` SELECT on `users` → `permission denied`. **2.2 done (human-verified 2026-07-07):** build clean; unit 10/10 (auth: register, dup→409, login, wrong-pass→401, unknown→401); `test:e2e` green — register→201 (no `passwordHash` in body), login→200, `/auth/me` 200 w/ Bearer & 401 without/bad token, invalid body→400. **2.3 done (human-verified 2026-07-07):** unit 15/15 (refresh-token: issue-stores-hash, rotate single-use, reuse-revokes-family, invalid→401, revoke); `test:e2e` green — register/login set HttpOnly refresh cookie (no token in body); `/auth/refresh` rotates + new access token; **replay old cookie→401 AND latest cookie→401 (family revoked)**; logout clears cookie (Max-Age=0) + token dead. **2.4 done (human-verified 2026-07-07):** @nestjs/throttler v6 on register/login from THROTTLE_TTL/LIMIT; curl 12× POST /auth/login → ten `401` then `429 429` (limit 10/60s); all three e2e suites still green with throttler active (e2e split per-file to isolate throttle counters). | Sub-steps: **2.1 ✅ · 2.2 ✅ · 2.3 ✅ · 2.4 ✅** — Phase 2 human-reviewed & signed off ✅ 2026-07-07. |
 | **3 — Chat CRUD + isolation** | Entities + migrations, CRUD per OpenAPI, soft-delete, ownership → 404 | ✅ | **3.1 done (human-verified 2026-07-07):** `nest build` + migration `tsc` clean; `migration:run` created `conversations`/`messages`/`audit_logs`; `\d` on each matches erd.md (FKs: conversations→users CASCADE, messages→conversations CASCADE, audit_logs→users SET NULL; `numeric(10,6)` cost; soft-delete `deleted_at`; all indexes); `migration:revert`+re-run clean; `llm_reader` SELECT on all three → `permission denied`. **3.2 done (human-verified 2026-07-07):** build clean; unit 20/20 (chat: list scoping, getOne/getMessages/softDelete→404 on foreign id, owned delete); `test:e2e` green — CRUD (create 201 'New Chat' → paginated list → get empty messages → delete 200 {message} → gone + 404); **cross-user isolation: B gets 404 on A's conv for get/messages/delete, absent from B's list**; message ordering (seeded out-of-order → first/second/third, NFR-008). **3.3 done (human-verified 2026-07-07):** append-only AuditService (insert-only, unit-tested for no update/delete) + `@Audit` decorator + AuditInterceptor (logs on success only); delete route audited. unit 22/22; `test:e2e` S6 green — delete→200 → `delete_conversation` audit row (userId + metadata.messageCount=2) → conversation 404/hidden → **messages RETAINED** (soft-delete, no cascade); cross-user delete → 404 + NO audit row. | Sub-steps: **3.1 ✅ · 3.2 ✅ · 3.3 ✅** — Phase 3 human-reviewed & signed off ✅ 2026-07-07. |
 | **4a — SQL guardrails** | `SqlValidatorService` + FinancialModule via `llm_reader` | ✅ | **4a.1 done (self-verified 2026-07-07, no DB):** `nest build` clean; `sql-validator.service.spec.ts` **41 tests green** (full suite 63/63). Blocks: all 14 keywords incl. mixed-case, stacked `;`, line/block comments, `pg_`/`pg_sleep`/`information_schema`, `users`/`conversations`/`messages`/`audit_logs` direct + via JOIN/UNION exfil, no-`financial_data` queries. Passes: CTE, aggregates, GROUP/ORDER BY, LIMIT, and blocked-words-in-string-literals (strengthening). **4a.2 done (human-verified 2026-07-07):** FinancialModule with a SECOND named `llm_reader` DataSource (statement_timeout 5s), FinancialData entity (read-only), FinancialService (Layer 2 validate → Layer 3 execute → 200-row cap + truncated). unit 66/66; `test:e2e` green — valid SELECT returns rows, cross-join capped at 200/truncated, **raw INSERT/UPDATE/DELETE via llm_reader → `permission denied` (Layer 3 independent of validator)**, `SELECT users` denied, `pg_sleep(10)` aborted by statement_timeout. | Sub-steps: **4a.1 ✅ · 4a.2 ✅** — Phase 4a human-reviewed & signed off ✅ 2026-07-07. |
-| **4b — LLM streaming** | OpenAI stream + tool loop, SSE protocol, save message/cost/audit | 🚧 | **4b.1 done (self-verified 2026-07-08, no DB/API — $0):** LlmModule building blocks — system prompt + execute_sql tool VERBATIM from prompt_spec (asserted, incl. new missing-year rule), StreamEvent interface, PromptBuilder, OutputValidator (Layer 4, log-only), cost helper (§5 pricing), `llm.service.ts` tool-loop generator. `nest build` clean; full suite **70/70**; mocked-OpenAI tests cover full S1 exchange (tool_call→execute→tool_result→answer→usage, cost asserted) + validator-rejection fed back without crash. **4b.2 done (human-verified 2026-07-08, mocked OpenAI — $0):** `POST /conversations/:id/messages` (JWT-guarded, ownership→404), MessagesService orchestrates stream→SSE→persist. e2e (38 passing): ordered SSE tool_call/tool_result/token/usage/done, user+assistant messages persisted (cost≈$0.0048, tool_calls, is_partial=false), audit `query` row written, cross-user→404. Unit: abort→partial (is_partial=true) save, OpenAI failure→`event:error` no crash. maxRetries=2 (GAP-005). | Sub-steps: **4b.1 ✅ · 4b.2 ✅** · 4b.3 live S1/S2 (budget) ⬜. Phase DoD: S1+S2 on gpt-4o. |
+| **4b — LLM streaming** | OpenAI stream + tool loop, SSE protocol, save message/cost/audit | ✅ | **4b.1 done (self-verified 2026-07-08, no DB/API — $0):** LlmModule building blocks — system prompt + execute_sql tool VERBATIM from prompt_spec (asserted, incl. new missing-year rule), StreamEvent interface, PromptBuilder, OutputValidator (Layer 4, log-only), cost helper (§5 pricing), `llm.service.ts` tool-loop generator. `nest build` clean; full suite **70/70**; mocked-OpenAI tests cover full S1 exchange (tool_call→execute→tool_result→answer→usage, cost asserted) + validator-rejection fed back without crash. **4b.2 done (human-verified 2026-07-08, mocked OpenAI — $0):** `POST /conversations/:id/messages` (JWT-guarded, ownership→404), MessagesService orchestrates stream→SSE→persist. e2e (38 passing): ordered SSE tool_call/tool_result/token/usage/done, user+assistant messages persisted (cost≈$0.0048, tool_calls, is_partial=false), audit `query` row written, cross-user→404. Unit: abort→partial (is_partial=true) save, OpenAI failure→`event:error` no crash. maxRetries=2 (GAP-005). **4b.3 done (human-run live, 2026-07-08):** S1/S2 verified end-to-end on gpt-4o-mini AND gpt-4o. All grounded correctly (numbers match DB): S1 single Apple 2023 = $96,995,000,000; S1 table = 15 tech companies 2024 exact; S2 Toyota → "I don't have data"; S2 2020 → "only 2022-2025"; S2 EBITDA → lists 4 metrics; **missing-year Shopify 2022 → "I don't have data for Shopify in 2022"** (rule works). Source disclosed (CR-013). Cost/audit persisted. Budget logged §4. | Sub-steps: **4b.1 ✅ · 4b.2 ✅ · 4b.3 ✅** — Phase 4b human-reviewed & signed off ✅ 2026-07-08. |
 | **5 — Usage + interruption** | Redis usage + guard, partial-save on abort | ⬜ | — | DoD: S3, S4, S5 (kill connection mid-stream for real) |
 | **6 — Frontend** | Auth pages, chat + `useStreamChat`, ToolCallWidget, Markdown/charts, sidebar, usage badge | ⬜ | — | DoD: human clicks through every scenario in a browser |
 | **7 — Polish** | README, full S1–S6 e2e, Helmet, audit review | ⬜ | — | README = 10% of grade |
 
-**Overall:** `5 / 9` phases done (Phase 0/1/2/3 ✅; Phase 4a ✅)
+**Overall:** `6 / 9` phases done (Phase 0/1/2/3 ✅; Phase 4a ✅; Phase 4b ✅)
 
 ---
 
@@ -48,8 +48,8 @@
 
 | Scenario | Description | Covered by Phase | Status | Evidence |
 |----------|-------------|------------------|--------|----------|
-| S1 | Successful query → grounded, streamed answer | 4b | ⬜ | — |
-| S2 | Data not available → clearly stated, no fabrication | 4b | ⬜ | — |
+| S1 | Successful query → grounded, streamed answer | 4b | ✅ | Live gpt-4o: single value (Apple 2023 net income $96.99B, matches DB) + table (15 tech cos 2024, all exact) |
+| S2 | Data not available → clearly stated, no fabrication | 4b | ✅ | Live gpt-4o: Toyota / 2020 / EBITDA / Shopify-2022 all declined correctly, no fabrication |
 | S3 | Stop mid-generation → partial saved, cost charged | 5 | ⬜ | — |
 | S4 | Usage limit exceeded → friendly 429 | 5 | ⬜ | — |
 | S5 | Browser refresh mid-stream → history intact, no dup/loss | 5, 6 | ⬜ | — |
@@ -69,11 +69,11 @@
 | FR-001 | Chat application | 3, 6 | 🚧 |
 | FR-002 | React + TypeScript frontend | 6 | ⬜ |
 | FR-003 | NestJS backend | 1 | ✅ |
-| FR-004 | Token-by-token streaming | 4b | ⬜ |
-| FR-005 | SQL tool call visible in UI | 4b, 6 | ⬜ |
+| FR-004 | Token-by-token streaming | 4b | ✅ |
+| FR-005 | SQL tool call visible in UI | 4b, 6 | 🚧 |
 | FR-006 | Markdown render (tables, charts) | 6 | ⬜ |
-| FR-007 | Grounding — DB only, no hallucination | 4a, 4b | ⬜ |
-| FR-008 | Missing data stated clearly | 4b | ⬜ |
+| FR-007 | Grounding — DB only, no hallucination | 4a, 4b | ✅ |
+| FR-008 | Missing data stated clearly | 4b | ✅ |
 | FR-009 | Spending limit per user (default $1) | 5 | ⬜ |
 | FR-010 | Limit reset on fixed interval | 5 | ⬜ |
 | FR-011 | Configurable limit & interval | 5 | ⬜ |
@@ -93,7 +93,7 @@
 
 | ID | Summary | Phase | Status |
 |----|---------|-------|--------|
-| NFR-001 | Low-latency streaming | 4b | ⬜ |
+| NFR-001 | Low-latency streaming | 4b | ✅ |
 | NFR-002 | Polished UI | 6 | ⬜ |
 | NFR-003 | Well-separated modules | 1–5 | ⬜ |
 | NFR-004 | Docker Compose | 1 | ✅ |
@@ -102,7 +102,7 @@
 | NFR-007 | No dup/missing messages on refresh | 5 | ⬜ |
 | NFR-008 | History in correct order | 3 | ✅ |
 | NFR-009 | Extensible architecture | 1 | ✅ |
-| NFR-010 | Graceful error handling | 1, 4b | 🔍 |
+| NFR-010 | Graceful error handling | 1, 4b | ✅ |
 | NFR-011 | Input validation / SQL injection | 2, 4a | ✅ |
 | NFR-012 | bcrypt password hashing | 2 | ✅ |
 | NFR-013 | API key via config | 1 | ✅ |
@@ -112,12 +112,12 @@
 
 | ID | Summary | Phase | Status |
 |----|---------|-------|--------|
-| CR-001/003/012 | Financial data accuracy / grounding | 4a, 4b | ⬜ |
+| CR-001/003/012 | Financial data accuracy / grounding | 4a, 4b | ✅ |
 | CR-002/018 | Append-only audit trail | 3, 4b | ✅ |
 | CR-004 | Access control on financial queries | 2, 4a | ✅ |
 | CR-005–008 | PDPA (consent, disclosure, erasure, breach) | 2, 3, 7 | ⬜ |
 | CR-009–011 | GDPR (by design, erasure, portability) | 2, 3 | ⬜ |
-| CR-013 | Disclose data source & coverage | 4b | ⬜ |
+| CR-013 | Disclose data source & coverage | 4b | ✅ |
 | CR-014 | OpenAI key never exposed | 1 | ✅ |
 | CR-015 | Spend tracking within $10 budget | 5 | ⬜ |
 | CR-016 | Hybrid token storage + rotation | 2 | ✅ |
@@ -131,7 +131,7 @@
 | GAP-002 | Authentication | 2 | ✅ |
 | GAP-003 | Password storage | 2 | ✅ |
 | GAP-004 | Data accuracy verification | 4a | ✅ |
-| GAP-005 | OpenAI failure handling | 4b | 🔍 |
+| GAP-005 | OpenAI failure handling | 4b | ✅ |
 | GAP-006 | API key management | 1 | ✅ |
 | GAP-007 | Auth rate limiting | 2 | ✅ |
 | GAP-008 | Audit logging | 3 | ✅ |
@@ -148,9 +148,13 @@
 
 | Date | Session | Model | Est. spend | Cumulative |
 |------|---------|-------|-----------|------------|
-| — | — | — | $0.00 | **$0.00 / $10.00** |
+| 2026-07-08 | 4b.3 dev pass (6 scenarios) | gpt-4o-mini | ~$0.002 actual (app bills $0.0280 at gpt-4o rates) | ~$0.002 |
+| 2026-07-08 | 4b.3 final pass (6 scenarios) | gpt-4o | $0.0282 | **~$0.030 / $10.00** |
 
 > Rule: dev/test with `gpt-4o-mini`; switch to `gpt-4o` for final verification only.
+> Note: `calculateCost` always applies gpt-4o pricing (prompt_spec §5 / CLAUDE.md §3 rule 8),
+> so the app-recorded cost on mini overstates real OpenAI spend ~16×. "Est. spend" above is the
+> real OpenAI-account spend for the $10 cap.
 
 ---
 
@@ -186,6 +190,8 @@
 
 | Date | Who | Phase | What happened | Blockers / follow-ups |
 |------|-----|-------|---------------|----------------------|
+| 2026-07-08 | human | 4b | Reviewed & signed off Phase 4b → row + requirement rows to ✅ (FR-004/007/008, NFR-001/010, CR-001/003/012, CR-013, GAP-005, S1, S2). Kept FR-005 🚧 (tool-call UI = Phase 6). Committed 4b on `feat/Phase4b_LLM_Streaming`, opened PR; set OPENAI_MODEL back to gpt-4o-mini. Overall 6/9. Synced README.md + CATCHUP.md. | Next: Phase 5 (usage limits + interruption / S5 real abort). |
+| 2026-07-08 | human + assistant | 4b.3 | Live S1/S2 grounding via `scripts/live-grounding.ts` (drives the real SSE endpoint). Human ran both gpt-4o-mini and gpt-4o. **All 6 scenarios grounded correctly on both models** — figures match the DB exactly; missing-year rule confirmed (Shopify 2022 → "no data", not fabricated); source disclosed. Real spend ~$0.030 total (well under $10). No prompt/tool changes made. **Phase 4b complete → 🔍 overall.** On `feat/Phase4b_*`. | 4b.3 ✅ (S1/S2, FR-004/007/008, CR-001/003/012/013, NFR-001 🔍; FR-005 🚧 UI Phase 6). Awaiting human review Phase 4b → ✅. Next: Phase 5 (usage limits + interruption). |
 | 2026-07-08 | human + assistant | 4b.2 | SSE endpoint + persistence + abort: `chat/messages.controller.ts` (POST /conversations/:id/messages, JWT-guarded, @Res SSE, @HttpCode 200, req 'close'→abort), `messages.service.ts` (buildHistory→save user→stream events→persist assistant+audit; abort→partial; failure→event:error). Added AbortSignal to LlmService.streamChat; OpenAI maxRetries=2. Wired MessagesController/Service into ChatModule (imports LlmModule). Verified: build clean, unit 73/73, human ran `test:e2e` → 38 passing incl. new Messages SSE suite (persistence, audit, 404). $0 spent (OpenAI mocked). On `feat/Phase4b_*`. | 4b.2 ✅ (NFR-010, GAP-005 🔍). Next: 4b.3 (live gpt-4o S1/S2 — the only budget step). Commit 4b.2. Budget spent so far: $0. |
 | 2026-07-08 | human + assistant | 4b.1 | Prereq: added missing-year rule to prompt_spec §1 (human chose option 1). Built LlmModule core: verbatim system-prompt + execute_sql tool constants, StreamEvent interface, PromptBuilder, OutputValidator (log-only), cost helper, `llm.service.ts` tool-loop async generator (stream→tool_call→FinancialService.execute→tool_result→resume; rejection fed back). Installed openai@4.104. **Self-verified (no DB/API, $0): build clean + suite 70/70** (mocked-OpenAI S1 exchange + rejection case + verbatim-constant asserts). Not yet wired into AppModule (that's 4b.2). On `feat/Phase4b_*`. | 4b.1 ✅. Next: 4b.2 (SSE endpoint + persistence + abort, mocked LLM). Commit 4b.1. Budget spent: $0. |
 | 2026-07-07 | human | 3 + 4a | Reviewed and signed off Phase 3 and Phase 4a → both rows ✅. Requirement rows to ✅: FR-014, NFR-008, GAP-008, CR-002/018 (Phase 3); GAP-001, GAP-004, NFR-011, CR-004 (Phase 4a). Kept 🚧 (frontend pending, Phase 6): FR-018, FR-019, S6. Overall 5/9. | Next: prompt_spec §3 (literal-blanking) + §1 (missing-year) doc updates, then Phase 4b (LLM streaming). |

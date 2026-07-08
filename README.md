@@ -13,7 +13,7 @@ persistent conversation history.
 
 ## 🚦 Build status
 
-Backend is built in verifiable phases (see [`PROGRESS.md`](PROGRESS.md)). **5 / 9 phases done.**
+Backend is built in verifiable phases (see [`PROGRESS.md`](PROGRESS.md)). **6 / 9 phases done.**
 
 | Phase | Scope | Status |
 |-------|-------|--------|
@@ -22,21 +22,22 @@ Backend is built in verifiable phases (see [`PROGRESS.md`](PROGRESS.md)). **5 / 
 | 2 | Auth — register/login, JWT, refresh rotation + reuse detection, throttler | ✅ |
 | 3 | Chat CRUD + user isolation (404) + append-only audit | ✅ |
 | 4a | SQL guardrails — validator (Layer 2) + `llm_reader` execution (Layer 3) | ✅ |
-| 4b | LLM streaming — OpenAI + `execute_sql` tool loop + SSE | ⬜ next |
-| 5 | Usage limits + interruption (partial-save) | ⬜ |
+| 4b | LLM streaming — OpenAI + `execute_sql` tool loop + SSE (grounding verified live on gpt-4o) | ✅ |
+| 5 | Usage limits + interruption (partial-save) | ⬜ next |
 | 6 | Frontend (React) | ⬜ |
 | 7 | Polish | ⬜ |
 
-The secure backend spine (auth, isolation, audit, both SQL guardrail layers) is complete and
-test-verified. The React frontend and live LLM streaming are not yet implemented.
+The full backend answer pipeline (auth, isolation, audit, both SQL guardrail layers, and grounded
+LLM streaming) is complete and test-verified — including a live gpt-4o grounding pass. Remaining:
+per-user usage limits + mid-stream interruption (Phase 5) and the React frontend (Phase 6).
 
 ---
 
 ## ✨ Features
 
-- **Natural-language → SQL** over income-statement data via a single `execute_sql` tool *(4b)*
-- **Token-by-token streaming** (`fetch()` + `ReadableStream` over POST, SSE) *(4b)*
-- **Grounded answers only** — no hallucinated figures; missing data stated clearly *(4b)*
+- **Natural-language → SQL** over income-statement data via a single `execute_sql` tool ✅
+- **Token-by-token streaming** (`fetch()` + `ReadableStream` over POST, SSE) ✅
+- **Grounded answers only** — no hallucinated figures; missing data stated clearly ✅ (verified live)
 - **Auth** — register / login / refresh (single-use rotation + reuse detection) / logout ✅
 - **User isolation** — every conversation/message scoped by JWT; foreign id → 404 ✅
 - **SQL guardrails** — code validator **and** SELECT-only `llm_reader` DB role ✅
@@ -53,7 +54,7 @@ test-verified. The React frontend and live LLM streaming are not yet implemented
 | ORM | TypeORM 0.3 (migrations, parameterized queries) |
 | Database | PostgreSQL 15 |
 | Cache / usage / refresh tokens | Redis 7 (ioredis) |
-| LLM | OpenAI GPT-4o (streaming + tool-calling) *(4b)* |
+| LLM | OpenAI GPT-4o (streaming + tool-calling) |
 | Frontend | React 18 + Vite + Tailwind + shadcn/ui *(6)* |
 | Infra | Docker Compose (PostgreSQL + Redis) |
 | Testing | Jest (unit) + Supertest (e2e) |
@@ -68,7 +69,7 @@ See [`docs/tech_stack.md`](docs/tech_stack.md) for the full rationale.
 React (Vite) ──HTTP + fetch-stream SSE (Bearer)──▶ NestJS API   [frontend: Phase 6]
                                                       │
    ┌────────────┬────────────┬────────────┬──────────┼───────────┐
- AuthModule  ChatModule  FinancialModule  LlmModule (4b)      HealthModule
+ AuthModule  ChatModule  FinancialModule  LlmModule          HealthModule
    │             │            │
  PG + Redis    PG (scoped)   PG via llm_reader (SELECT-only)
 ```
@@ -166,7 +167,7 @@ smc_fullstack/
 │   │   ├── auth/              # register/login/refresh/logout, JWT, refresh-token store
 │   │   ├── chat/              # conversations/messages CRUD + isolation
 │   │   ├── financial/         # llm_reader execution (Layer 3) + FinancialData entity
-│   │   └── llm/               # SqlValidatorService (Layer 2)   [+ streaming in 4b]
+│   │   └── llm/               # SqlValidatorService (Layer 2) + OpenAI streaming tool loop
 │   ├── migrations/            # TypeORM migrations
 │   └── test/                  # e2e specs
 ├── data/financial_data.sql    # provided dump (49 companies × 2022–2025 = 192 rows)
