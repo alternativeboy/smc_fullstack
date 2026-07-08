@@ -23,7 +23,7 @@ all six assignment scenarios (S1–S6) verified end-to-end.
 | 4a / 4b | SQL guardrails (validator + `llm_reader`) · LLM streaming + tool loop | ✅ |
 | 5 | Usage limits + mid-stream interruption (partial save) | ✅ |
 | 6 | React frontend — auth, streaming chat, SQL widget, tables/charts, sidebar, usage | 🔍 |
-| 7 | Polish (README, Helmet, audit sweep, fresh-clone) | 🚧 |
+| 7 | Polish (README, Helmet, audit sweep, fresh-clone) | 🔍 (fresh-clone acceptance passed) |
 
 ---
 
