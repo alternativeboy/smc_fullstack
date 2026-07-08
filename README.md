@@ -11,16 +11,37 @@ persistent conversation history.
 
 ---
 
+## 🚦 Build status
+
+Backend is built in verifiable phases (see [`PROGRESS.md`](PROGRESS.md)). **5 / 9 phases done.**
+
+| Phase | Scope | Status |
+|-------|-------|--------|
+| 0 | Ground truth (repo, docs, dump verified) | ✅ |
+| 1 | Infra — Docker (PG + Redis + `llm_reader`), NestJS scaffold, config, health | ✅ |
+| 2 | Auth — register/login, JWT, refresh rotation + reuse detection, throttler | ✅ |
+| 3 | Chat CRUD + user isolation (404) + append-only audit | ✅ |
+| 4a | SQL guardrails — validator (Layer 2) + `llm_reader` execution (Layer 3) | ✅ |
+| 4b | LLM streaming — OpenAI + `execute_sql` tool loop + SSE | ⬜ next |
+| 5 | Usage limits + interruption (partial-save) | ⬜ |
+| 6 | Frontend (React) | ⬜ |
+| 7 | Polish | ⬜ |
+
+The secure backend spine (auth, isolation, audit, both SQL guardrail layers) is complete and
+test-verified. The React frontend and live LLM streaming are not yet implemented.
+
+---
+
 ## ✨ Features
 
-- **Natural-language → SQL** over income-statement data via a single `execute_sql` tool
-- **Token-by-token streaming** (`fetch()` + `ReadableStream` over POST, SSE wire format)
-- **Visible tool calls** — the generated SQL and its results are shown inline (FR-005)
-- **Grounded answers only** — no hallucinated figures; missing data stated clearly
-- **Auth** — register / login / refresh (rotation) / logout with a hybrid token model
-- **Per-user spending limits** — Redis-backed usage tracking with TTL-based reset
-- **Conversation history** — revisit, soft-delete (with confirmation), user-isolated
-- **Stop / interrupt** mid-generation — partial message saved, partial cost charged
+- **Natural-language → SQL** over income-statement data via a single `execute_sql` tool *(4b)*
+- **Token-by-token streaming** (`fetch()` + `ReadableStream` over POST, SSE) *(4b)*
+- **Grounded answers only** — no hallucinated figures; missing data stated clearly *(4b)*
+- **Auth** — register / login / refresh (single-use rotation + reuse detection) / logout ✅
+- **User isolation** — every conversation/message scoped by JWT; foreign id → 404 ✅
+- **SQL guardrails** — code validator **and** SELECT-only `llm_reader` DB role ✅
+- **Append-only audit trail** ✅
+- **Per-user spending limits** *(5)* · **conversation history + soft-delete** ✅
 
 ---
 
@@ -28,40 +49,37 @@ persistent conversation history.
 
 | Layer | Technology |
 |-------|-----------|
-| Frontend | React 18 + TypeScript + Vite, Tailwind CSS + shadcn/ui, Zustand, Recharts |
-| Backend | NestJS 10+ (feature modules), Passport + JWT, class-validator |
-| ORM | TypeORM 0.3+ (migrations, parameterized queries) |
-| Database | PostgreSQL 15+ |
-| Cache / usage / refresh tokens | Redis 7+ |
-| LLM | OpenAI GPT-4o (streaming + tool-calling) |
+| Backend | NestJS 10 (feature modules), Passport + JWT, class-validator, @nestjs/throttler |
+| ORM | TypeORM 0.3 (migrations, parameterized queries) |
+| Database | PostgreSQL 15 |
+| Cache / usage / refresh tokens | Redis 7 (ioredis) |
+| LLM | OpenAI GPT-4o (streaming + tool-calling) *(4b)* |
+| Frontend | React 18 + Vite + Tailwind + shadcn/ui *(6)* |
 | Infra | Docker Compose (PostgreSQL + Redis) |
 | Testing | Jest (unit) + Supertest (e2e) |
 
-See [`docs/tech_stack.md`](docs/tech_stack.md) for the full rationale and alternatives considered.
+See [`docs/tech_stack.md`](docs/tech_stack.md) for the full rationale.
 
 ---
 
 ## 🏗️ Architecture
 
 ```
-React (Vite) ──HTTP + fetch-stream SSE (Bearer)──▶ NestJS API
+React (Vite) ──HTTP + fetch-stream SSE (Bearer)──▶ NestJS API   [frontend: Phase 6]
                                                       │
-      ┌───────────────┬───────────────┬──────────────┼───────────────┐
-    AuthModule     ChatModule      LlmModule     UsageModule      HealthModule
-      │                │               │              │
-   Postgres+Redis   Postgres      OpenAI GPT-4o    Redis
-                                     │
-                              FinancialModule ──SELECT only (llm_reader)──▶ Postgres
+   ┌────────────┬────────────┬────────────┬──────────┼───────────┐
+ AuthModule  ChatModule  FinancialModule  LlmModule (4b)      HealthModule
+   │             │            │
+ PG + Redis    PG (scoped)   PG via llm_reader (SELECT-only)
 ```
 
-- **Streaming** uses `fetch()` + `ReadableStream` (not `EventSource`) because the stream is on
-  a **POST** and must carry an `Authorization: Bearer` header.
-- **LLM-generated SQL** passes `SqlValidatorService` (Layer 2) **and** executes as the
-  SELECT-only **`llm_reader`** Postgres user (Layer 3) — defense in depth.
-- **Tokens:** short-lived access JWT kept **in memory only**; long-lived refresh token in an
+- **SQL guardrails (defense in depth):** LLM SQL passes `SqlValidatorService` (Layer 2) **and**
+  runs as the SELECT-only **`llm_reader`** Postgres role (Layer 3). Even if the validator is
+  bypassed, Postgres rejects every write.
+- **Tokens:** short-lived access JWT (in memory on the client); long-lived refresh token in an
   **httpOnly, Secure, SameSite=Strict cookie** with single-use rotation tracked in Redis.
 
-Full diagrams and data flows: [`docs/architecture_overview.md`](docs/architecture_overview.md).
+Full diagrams: [`docs/architecture_overview.md`](docs/architecture_overview.md).
 
 ---
 
@@ -71,104 +89,93 @@ Full diagrams and data flows: [`docs/architecture_overview.md`](docs/architectur
 
 - **Node.js** 20+ and **npm**
 - **Docker** + **Docker Compose**
-- An **OpenAI API key**
+- An **OpenAI API key** (only needed once Phase 4b lands; a placeholder is fine before that)
 
-### 1. Clone & configure environment
+### 1. Configure environment
 
 ```bash
-git clone <repo-url> siametrics-chat
-cd siametrics-chat
-cp .env.example .env      # then fill in the values below
+cp .env.example .env
 ```
 
-Required environment variables (see `.env.example`):
+`.env` is the single source of truth for both Docker Compose and the backend. See
+[`.env.example`](.env.example) for the full list; at minimum set:
 
-| Variable | Description |
-|----------|-------------|
-| `OPENAI_API_KEY` | Your OpenAI API key (never commit this) |
-| `OPENAI_MODEL` | `gpt-4o-mini` for dev, `gpt-4o` for final |
-| `JWT_SECRET` | Secret for signing access tokens |
-| `JWT_ACCESS_TTL` | Access-token lifetime (e.g. `15m`) |
-| `JWT_REFRESH_TTL` | Refresh-token lifetime (e.g. `7d`) |
-| `DATABASE_URL` | Postgres connection string (app user) |
-| `LLM_READER_URL` | Postgres connection string for the SELECT-only `llm_reader` |
-| `REDIS_URL` | Redis connection string |
-| `USAGE_LIMIT_USD` | Default per-user spending limit (e.g. `1.00`) |
-| `USAGE_RESET_INTERVAL` | Usage reset window (e.g. `24h`) |
-| `CORS_ORIGIN` | Frontend origin allowlist (e.g. `http://localhost:5173`) |
+| Variable | Notes |
+|----------|-------|
+| `LLM_READER_PASSWORD` | Password for the SELECT-only role (Compose creates it + the app connects with it) |
+| `OPENAI_API_KEY` | Placeholder OK until Phase 4b; must be non-empty (validated at boot) |
+| `JWT_SECRET`, `JWT_REFRESH_SECRET` | Any strong secrets |
+
+Sensible defaults are provided for `DATABASE_*` (host `localhost`, db `financial_db`,
+user/pass `postgres`), `REDIS_*`, `BCRYPT_COST=12`, `USAGE_LIMIT`, `THROTTLE_*`, and
+`CORS_ORIGIN=http://localhost:5173`.
 
 ### 2. Start the data layer
 
 ```bash
-docker compose up -d       # PostgreSQL 15 + Redis 7
+docker compose up -d
 ```
 
-This provisions PostgreSQL (loading `data/financial_data.sql`), creates the SELECT-only
-`llm_reader` role, and starts Redis.
+Provisions PostgreSQL (loading `data/financial_data.sql` → **192 rows**), creates the
+SELECT-only `llm_reader` role, and starts Redis.
 
 ### 3. Run the backend
 
 ```bash
 cd backend
 npm install
-npm run migration:run      # apply TypeORM migrations
+npm run migration:run      # apply TypeORM migrations (users, conversations, messages, audit_logs)
 npm run start:dev          # http://localhost:3000
 ```
 
-Verify: `curl http://localhost:3000/api/health` should return a green status.
+Verify: `curl http://localhost:3000/api/health` → `{"status":"ok", ... postgres up, redis up}`.
 
-### 4. Run the frontend
+### 4. Frontend
 
-```bash
-cd frontend
-npm install
-npm run dev                # http://localhost:5173
-```
-
-Open **http://localhost:5173**, register an account, and start asking questions.
+Not yet implemented — arrives in **Phase 6** (`frontend/`, React + Vite).
 
 ---
 
 ## 🧪 Testing
 
 ```bash
-# Backend — from ./backend
-npm run test               # unit tests (Jest)
-npm run test:e2e           # e2e tests (Supertest)
-npm run test:cov           # coverage
+cd backend
+npm test          # unit tests (66 green: env, auth, refresh rotation, chat, audit, SQL validator, financial)
+npm run test:e2e  # e2e (needs docker stack): health, auth, auth-refresh, chat, S6/audit, financial/llm_reader
 ```
 
-The highest-value tests are the **SQL guardrail** unit tests (multi-statement, comment bypass,
-`pg_`/other-table access, UNION exfiltration) and the **auth e2e** (cookie rotation + reuse
-detection).
+The highest-value tests: the **SQL validator** attack matrix (`sql-validator.service.spec.ts`,
+41 cases) and the **`llm_reader` Layer-3** integration (`financial.e2e-spec.ts` — raw writes →
+`permission denied`).
 
 ---
 
 ## 📁 Project Structure
 
 ```
-siametrics-chat/
-├── docker-compose.yml     # PostgreSQL + Redis
-├── .env.example           # Environment template
-├── backend/               # NestJS API (feature modules: auth, chat, llm,
-│   │                      #   financial, usage, health, common, config)
+smc_fullstack/
+├── docker-compose.yml         # PostgreSQL + Redis + init (llm_reader, indexes)
+├── docker/postgres/           # init SQL + llm_reader role script
+├── .env.example               # single-source env template
+├── backend/                   # NestJS API
 │   ├── src/
-│   ├── test/              # e2e tests
-│   └── migrations/        # TypeORM migrations
-├── frontend/              # React + Vite app
-│   └── src/               # pages, components, hooks, services, stores
-├── data/
-│   └── financial_data.sql # Provided SQL dump
-└── docs/                  # Authoritative specs (see below)
+│   │   ├── config/            # ConfigModule + Joi validation + TypeORM data-source
+│   │   ├── health/            # GET /api/health (terminus + redis indicator)
+│   │   ├── redis/             # shared ioredis client
+│   │   ├── common/            # base entity, audit (service/interceptor/@Audit), decorators
+│   │   ├── auth/              # register/login/refresh/logout, JWT, refresh-token store
+│   │   ├── chat/              # conversations/messages CRUD + isolation
+│   │   ├── financial/         # llm_reader execution (Layer 3) + FinancialData entity
+│   │   └── llm/               # SqlValidatorService (Layer 2)   [+ streaming in 4b]
+│   ├── migrations/            # TypeORM migrations
+│   └── test/                  # e2e specs
+├── data/financial_data.sql    # provided dump (49 companies × 2022–2025 = 192 rows)
+└── docs/                      # authoritative specs (source of truth)
 ```
-
-Full layout: [`docs/folder_structure.md`](docs/folder_structure.md).
 
 ---
 
 ## 📚 Documentation
-
-The `docs/` folder is the source of truth. Start here:
 
 | Document | Contents |
 |----------|----------|
@@ -180,26 +187,25 @@ The `docs/` folder is the source of truth. Start here:
 | [`erd.md`](docs/erd.md) | Data model (Postgres tables + Redis keys) |
 | [`openapi_spec.yaml`](docs/openapi_spec.yaml) | The API contract (binding) |
 | [`prompt_spec.md`](docs/prompt_spec.md) | System prompt, tool def, 5-layer guardrails, scenarios S1–S6 |
+| [`phase0_ground_truth_report.md`](docs/phase0_ground_truth_report.md) | Dump-vs-spec verification report |
 
-Project conventions and locked decisions live in [`CLAUDE.md`](CLAUDE.md); current build status
-is tracked in [`PROGRESS.md`](PROGRESS.md).
+Conventions and locked decisions: [`CLAUDE.md`](CLAUDE.md). Live status: [`PROGRESS.md`](PROGRESS.md).
 
 ---
 
 ## 🔒 Security Notes
 
-- Secrets come from env via `@nestjs/config` only — never hardcoded, never logged. `.env` is
-  gitignored; keep `.env.example` current.
-- LLM SQL is never trusted: it is validated **and** executed as the read-only `llm_reader` role.
-- Passwords are hashed with **bcrypt** (cost ≥ 12); `password_hash` is `select: false`.
-- Every conversation/message query is scoped by `user_id` from the JWT — a foreign or
-  non-existent id returns **404**, never another user's data.
-- Audit logs are **append-only** (never updated or deleted).
-- CORS uses an explicit origin allowlist with `credentials: true` (required for the refresh
-  cookie).
+- Secrets come from env via `@nestjs/config` only (validated at boot) — never hardcoded/logged.
+  `.env` is gitignored; keep `.env.example` current.
+- LLM SQL is never trusted: validated **and** executed as the read-only `llm_reader` role, with a
+  statement timeout and a 200-row cap.
+- Passwords hashed with **bcrypt** (cost ≥ 12); `password_hash` is `select: false`.
+- Every conversation/message query is scoped by `user_id` from the JWT — foreign/unknown id → **404**.
+- Audit logs are **append-only** (insert-only service; no update/delete path).
+- CORS uses an explicit origin allowlist with `credentials: true` (for the refresh cookie).
 
-> **HTTPS note:** the `Secure` refresh cookie requires a secure context. `http://localhost` is
-> treated as secure by browsers for local dev; any deployed environment must sit behind TLS.
+> **HTTPS note:** the `Secure` refresh cookie requires a secure context. `localhost` is treated
+> as secure for dev; any deployment must sit behind TLS.
 
 ---
 
