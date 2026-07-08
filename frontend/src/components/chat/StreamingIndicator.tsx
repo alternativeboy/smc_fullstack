@@ -1,9 +1,9 @@
 export function StreamingIndicator() {
   return (
-    <span className="ml-1 inline-flex items-center gap-1 align-middle">
-      <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-current [animation-delay:-0.3s]" />
-      <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-current [animation-delay:-0.15s]" />
-      <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-current" />
+    <span className="inline-flex items-center gap-1.5 py-1" role="status" aria-label="Generating">
+      <span className="h-2 w-2 animate-pulse rounded-full bg-primary" />
+      <span className="h-2 w-2 animate-pulse rounded-full bg-primary [animation-delay:0.2s]" />
+      <span className="h-2 w-2 animate-pulse rounded-full bg-primary [animation-delay:0.4s]" />
     </span>
   );
 }

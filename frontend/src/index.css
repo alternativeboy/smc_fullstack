@@ -2,31 +2,44 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+ * Theme from the approved mockup (frontend/design). Warm paper + emerald green,
+ * green-tinted neutrals. Tokens are bare oklch "L C H" triplets consumed via
+ * oklch(var(--x) / <alpha-value>) in tailwind.config.js (keeps /opacity utilities).
+ */
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
-    --radius: 0.5rem;
+    --background: 1 0 0;               /* white main surface */
+    --foreground: 0.22 0.015 145;     /* dark green-gray text */
+    --card: 1 0 0;
+    --card-foreground: 0.22 0.015 145;
+    --popover: 1 0 0;
+    --popover-foreground: 0.22 0.015 145;
+    --primary: 0.62 0.13 155;         /* emerald */
+    --primary-foreground: 1 0 0;
+    --secondary: 0.93 0.03 155;       /* active green tint */
+    --secondary-foreground: 0.3 0.05 155;
+    --muted: 0.95 0.01 145;           /* neutral hover */
+    --muted-foreground: 0.5 0.015 145;
+    --accent: 0.93 0.03 155;
+    --accent-foreground: 0.3 0.05 155;
+    --destructive: 0.58 0.17 28;      /* terracotta (mockup has no red) */
+    --destructive-foreground: 1 0 0;
+    --border: 0.92 0.006 90;
+    --input: 0.9 0.006 90;
+    --ring: 0.62 0.13 155;
+    --sidebar: 0.985 0.006 145;       /* faint green-white */
+    --sidebar-border: 0.91 0.008 145;
+    --warning: 0.97 0.03 60;          /* amber limit banner */
+    --warning-border: 0.85 0.07 60;
+    --warning-foreground: 0.4 0.05 60;
+    --radius: 0.75rem;
   }
+
   * {
     @apply border-border;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground font-sans antialiased;
   }
 }

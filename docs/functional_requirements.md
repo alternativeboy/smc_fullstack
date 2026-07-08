@@ -59,6 +59,7 @@
 | ID | Description | Priority | Source Section | Status |
 |----|-------------|----------|----------------|--------|
 | FR-022 | PostgreSQL database loaded with financial_data.sql (49 companies, 2022-2025) | Critical | §4, §6 | `[ ]` |
+| FR-024 | UI/UX redesign of the frontend to the approved mockup (`frontend/design/`), preserving all functional components and grading-critical widgets (streaming, Stop, tool-call/SQL, tables/charts, sidebar, delete-confirm, usage badge) | Medium | derived (post-v1) | `[ ]` |
 
 ---
 

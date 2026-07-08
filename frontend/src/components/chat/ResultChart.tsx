@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { Bar, BarChart, LabelList, ResponsiveContainer, Tooltip, XAxis } from 'recharts';
 import { buildChart, compactUsd } from '@/lib/chartData';
 
 /**
@@ -12,15 +12,38 @@ export function ResultChart({ content }: { content: string }) {
   if (!chart) return null;
 
   return (
-    <div className="my-2 rounded-md border p-2">
-      <p className="mb-1 text-xs text-muted-foreground">{chart.valueLabel}</p>
-      <ResponsiveContainer width="100%" height={220}>
-        <BarChart data={chart.data} margin={{ top: 4, right: 8, bottom: 4, left: 8 }}>
-          <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-          <XAxis dataKey="label" tick={{ fontSize: 10 }} interval={0} angle={-30} textAnchor="end" height={60} />
-          <YAxis tick={{ fontSize: 10 }} tickFormatter={(v) => compactUsd(Number(v))} width={56} />
-          <Tooltip formatter={(v) => compactUsd(Number(v))} />
-          <Bar dataKey="value" fill="hsl(var(--primary))" radius={[2, 2, 0, 0]} />
+    <div className="max-w-[640px] rounded-2xl border bg-card p-5 shadow-sm">
+      <p className="mb-3 text-[13.5px] font-bold text-foreground">{chart.valueLabel}</p>
+      <ResponsiveContainer width="100%" height={200}>
+        <BarChart data={chart.data} margin={{ top: 22, right: 8, bottom: 4, left: 8 }}>
+          <defs>
+            <linearGradient id="fr024BarGreen" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="oklch(0.68 0.14 155)" />
+              <stop offset="100%" stopColor="oklch(0.58 0.13 155)" />
+            </linearGradient>
+          </defs>
+          <XAxis
+            dataKey="label"
+            tickLine={false}
+            axisLine={{ stroke: 'oklch(0.92 0.006 90)' }}
+            tick={{ fontSize: 11, fill: 'oklch(0.5 0.015 145)' }}
+            interval={0}
+            height={48}
+            angle={-20}
+            textAnchor="end"
+          />
+          <Tooltip
+            cursor={{ fill: 'oklch(0.95 0.01 145)' }}
+            formatter={(v) => compactUsd(Number(v))}
+          />
+          <Bar dataKey="value" fill="url(#fr024BarGreen)" radius={[6, 6, 2, 2]} maxBarSize={64}>
+            <LabelList
+              dataKey="value"
+              position="top"
+              formatter={(v: unknown) => compactUsd(Number(v))}
+              style={{ fontSize: 11, fontFamily: '"IBM Plex Mono", monospace', fill: 'oklch(0.5 0.015 145)' }}
+            />
+          </Bar>
         </BarChart>
       </ResponsiveContainer>
     </div>

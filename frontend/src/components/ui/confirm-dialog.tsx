@@ -13,9 +13,9 @@ interface Props {
 export function ConfirmDialog({ open, title, description, confirmText = 'Confirm', onConfirm, onCancel }: Props) {
   if (!open) return null;
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onCancel}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm" onClick={onCancel}>
       <div
-        className="w-full max-w-sm rounded-lg border bg-card p-6 shadow-lg"
+        className="w-full max-w-sm rounded-2xl border bg-card p-6 shadow-frame"
         role="alertdialog"
         aria-modal="true"
         onClick={(e) => e.stopPropagation()}

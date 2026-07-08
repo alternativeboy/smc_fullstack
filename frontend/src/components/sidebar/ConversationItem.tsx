@@ -13,22 +13,27 @@ export function ConversationItem({ conversation, active, onSelect, onDelete }: P
   return (
     <div
       className={cn(
-        'group flex cursor-pointer items-center justify-between rounded px-2 py-1.5 text-sm hover:bg-accent',
-        active && 'bg-accent',
+        'group flex cursor-pointer items-center justify-between gap-2 rounded-[10px] px-3 py-2 text-[13.5px] transition-colors',
+        active
+          ? 'bg-secondary font-semibold text-secondary-foreground'
+          : 'text-muted-foreground hover:bg-muted',
       )}
       onClick={() => onSelect(conversation.id)}
     >
-      <span className="truncate">{conversation.title}</span>
+      <span className="flex min-w-0 items-center gap-2">
+        {active && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />}
+        <span className="truncate">{conversation.title}</span>
+      </span>
       <button
         type="button"
         aria-label="Delete conversation"
-        className="ml-2 shrink-0 text-muted-foreground opacity-0 hover:text-destructive group-hover:opacity-100"
+        className="shrink-0 text-muted-foreground opacity-0 transition-opacity hover:text-destructive group-hover:opacity-100"
         onClick={(e) => {
           e.stopPropagation();
           onDelete(conversation.id);
         }}
       >
-        <Trash2 className="h-4 w-4" />
+        <Trash2 className="h-3.5 w-3.5" />
       </button>
     </div>
   );
