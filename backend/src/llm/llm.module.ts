@@ -14,7 +14,8 @@ import { PromptBuilderService } from './services/prompt-builder.service';
       provide: OPENAI_CLIENT,
       inject: [ConfigService],
       useFactory: (config: ConfigService) =>
-        new OpenAI({ apiKey: config.getOrThrow<string>('OPENAI_API_KEY') }),
+        // maxRetries: SDK retries transient failures with backoff (GAP-005).
+        new OpenAI({ apiKey: config.getOrThrow<string>('OPENAI_API_KEY'), maxRetries: 2 }),
     },
     LlmService,
     PromptBuilderService,

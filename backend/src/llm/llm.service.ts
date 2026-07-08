@@ -43,6 +43,7 @@ export class LlmService {
   async *streamChat(
     history: ConversationTurn[],
     userMessage: string,
+    signal?: AbortSignal,
   ): AsyncGenerator<StreamEvent, StreamResult, void> {
     const messages = this.promptBuilder.build(history, userMessage);
     let content = '';
@@ -53,13 +54,16 @@ export class LlmService {
     let lastRows: unknown[] = [];
 
     for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
-      const stream = await this.openai.chat.completions.create({
-        model: this.model,
-        messages,
-        tools: [EXECUTE_SQL_TOOL],
-        stream: true,
-        stream_options: { include_usage: true },
-      });
+      const stream = await this.openai.chat.completions.create(
+        {
+          model: this.model,
+          messages,
+          tools: [EXECUTE_SQL_TOOL],
+          stream: true,
+          stream_options: { include_usage: true },
+        },
+        { signal }, // aborts the HTTP request when the client disconnects
+      );
 
       let roundContent = '';
       const acc: Record<number, ToolCallAcc> = {};
