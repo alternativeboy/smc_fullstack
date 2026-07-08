@@ -26,6 +26,10 @@ out/
 frontend/dist/
 frontend/dist-ssr/
 *.local
+# vite.config.ts compiled by `tsc -b` (build artifacts)
+frontend/vite.config.js
+frontend/vite.config.d.ts
+frontend/vite.config.timestamp-*.mjs
 
 # Prompts
 prompts

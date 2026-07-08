@@ -9,17 +9,22 @@ import {
   Res,
   UnauthorizedException,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ThrottlerGuard } from '@nestjs/throttler';
 import { CookieOptions, Request, Response } from 'express';
+import { Audit } from '../common/decorators/audit.decorator';
 import { AuthUser, CurrentUser } from '../common/decorators/current-user.decorator';
+import { AuditInterceptor } from '../common/interceptors/audit.interceptor';
 import { AuthResult, AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 
 const REFRESH_COOKIE = 'refreshToken';
+
+type AuditableRequest = Request & { auditUserId?: string; auditMetadata?: Record<string, unknown> };
 
 @Controller('auth')
 export class AuthController {
@@ -31,15 +36,33 @@ export class AuthController {
   // Brute-force protection on the credential-accepting routes (NFR-014/GAP-007).
   @Post('register')
   @UseGuards(ThrottlerGuard)
-  async register(@Body() dto: RegisterDto, @Res({ passthrough: true }) res: Response) {
-    return this.respond(res, await this.auth.register(dto));
+  @UseInterceptors(AuditInterceptor)
+  @Audit('register', 'auth')
+  async register(
+    @Body() dto: RegisterDto,
+    @Res({ passthrough: true }) res: Response,
+    @Req() req: AuditableRequest,
+  ) {
+    const result = await this.auth.register(dto);
+    req.auditUserId = result.user.id;
+    req.auditMetadata = { email: dto.email };
+    return this.respond(res, result);
   }
 
   @Post('login')
   @UseGuards(ThrottlerGuard)
+  @UseInterceptors(AuditInterceptor)
+  @Audit('login', 'auth')
   @HttpCode(HttpStatus.OK)
-  async login(@Body() dto: LoginDto, @Res({ passthrough: true }) res: Response) {
-    return this.respond(res, await this.auth.login(dto));
+  async login(
+    @Body() dto: LoginDto,
+    @Res({ passthrough: true }) res: Response,
+    @Req() req: AuditableRequest,
+  ) {
+    const result = await this.auth.login(dto);
+    req.auditUserId = result.user.id;
+    req.auditMetadata = { email: dto.email };
+    return this.respond(res, result);
   }
 
   @Post('refresh')
@@ -54,6 +77,8 @@ export class AuthController {
 
   @Post('logout')
   @HttpCode(HttpStatus.OK)
+  @UseInterceptors(AuditInterceptor)
+  @Audit('logout', 'auth')
   async logout(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
     await this.auth.logout(req.cookies?.[REFRESH_COOKIE]);
     res.clearCookie(REFRESH_COOKIE, this.cookieOptions());
