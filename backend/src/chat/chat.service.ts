@@ -83,6 +83,11 @@ export class ChatService {
     return { message: 'Conversation deleted successfully', messageCount };
   }
 
+  /** Public ownership check (FR-014) for other services (e.g. streaming). */
+  assertOwned(userId: string, id: string): Promise<Conversation> {
+    return this.findOwned(userId, id);
+  }
+
   /**
    * The single choke point for FR-014: scope by user_id AND id. A foreign or
    * non-existent (or soft-deleted) id yields null → 404 — never another user's data.
