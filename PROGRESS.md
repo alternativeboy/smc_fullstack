@@ -38,7 +38,7 @@
 | **4b — LLM streaming** | OpenAI stream + tool loop, SSE protocol, save message/cost/audit | ✅ | **4b.1 done (self-verified 2026-07-08, no DB/API — $0):** LlmModule building blocks — system prompt + execute_sql tool VERBATIM from prompt_spec (asserted, incl. new missing-year rule), StreamEvent interface, PromptBuilder, OutputValidator (Layer 4, log-only), cost helper (§5 pricing), `llm.service.ts` tool-loop generator. `nest build` clean; full suite **70/70**; mocked-OpenAI tests cover full S1 exchange (tool_call→execute→tool_result→answer→usage, cost asserted) + validator-rejection fed back without crash. **4b.2 done (human-verified 2026-07-08, mocked OpenAI — $0):** `POST /conversations/:id/messages` (JWT-guarded, ownership→404), MessagesService orchestrates stream→SSE→persist. e2e (38 passing): ordered SSE tool_call/tool_result/token/usage/done, user+assistant messages persisted (cost≈$0.0048, tool_calls, is_partial=false), audit `query` row written, cross-user→404. Unit: abort→partial (is_partial=true) save, OpenAI failure→`event:error` no crash. maxRetries=2 (GAP-005). **4b.3 done (human-run live, 2026-07-08):** S1/S2 verified end-to-end on gpt-4o-mini AND gpt-4o. All grounded correctly (numbers match DB): S1 single Apple 2023 = $96,995,000,000; S1 table = 15 tech companies 2024 exact; S2 Toyota → "I don't have data"; S2 2020 → "only 2022-2025"; S2 EBITDA → lists 4 metrics; **missing-year Shopify 2022 → "I don't have data for Shopify in 2022"** (rule works). Source disclosed (CR-013). Cost/audit persisted. Budget logged §4. | Sub-steps: **4b.1 ✅ · 4b.2 ✅ · 4b.3 ✅** — Phase 4b human-reviewed & signed off ✅ 2026-07-08. |
 | **5 — Usage + interruption** | Redis usage + guard, partial-save on abort | ✅ | **5.1 done (human-verified 2026-07-08, $0):** UsageModule — `usage.service.ts` (atomic `INCRBYFLOAT` + EXPIRE-on-first, TTL reset, limit/interval from config), `UsageLimitGuard` (pre-flight → friendly 429 UsageLimitError + resetAt), `GET /usage/status`; charge on normal completion. unit 79/79 (TTL window integrity, atomic no-read-modify-write, getStatus math); `test:e2e` — **S4**: message charges usage → exhaust → 429 friendly body; concurrent 20× track() sums exactly (real Redis atomicity). **5.2 done (human-verified 2026-07-08, $0):** LlmService handles abort internally → returns partial with fair cost (chars/4 estimate; prompt dominates); MessagesService persists is_partial=true + charges Redis + audits. Fixes: `res.on('close')` (reliable disconnect vs req 'close') + defensive `write()` (dead-socket writes no longer abort persistence). unit 79/79; `test:e2e` **S3/S5** — raw http `req.destroy()` severs mid-stream → partial saved (content + cost>0), usage charged, audit is_partial row, history intact (user + 1 partial, ordered, no dup). | Sub-steps: **5.1 ✅ · 5.2 ✅** — Phase 5 human-reviewed & signed off ✅ 2026-07-08. |
 | **6 — Frontend** | Auth pages, chat + `useStreamChat`, ToolCallWidget, Markdown/charts, sidebar, usage badge | ✅ | **6.1 code-complete (2026-07-08):** Vite + React 18 + TS + Tailwind + hand-rolled shadcn-style ui + Zustand + React Router. Auth: `auth.store` (token IN MEMORY, no persist), `api.ts` (Bearer; credentials:'include' only on refresh/logout; 401→silent-refresh-once→retry→else /login), `auth.service`, Login/Register pages, `useAuthBootstrap` (mount refresh + /me), ProtectedRoute. `npm run build` clean (tsc + vite, 62 modules). **Browser DoD ✅ (human, 2026-07-08):** register → reload stays logged in via silent refresh; access token NOT in local/session storage; logout→/login; bad login errors. Fixed a cross-origin cookie drop with a **Vite dev proxy** (same-origin). **6.2 code-complete (2026-07-08, builds ✅ / browser ⏳):** `chat.store` + `useStreamChat` (fetch+ReadableStream SSE parse, AbortController Stop, 401 silent-refresh + 429 branch), ChatPage (create/select, most-recent-on-load restores history), ChatMessage/ChatInput/StreamingIndicator, `is_partial` "interrupted" note (S5). `npm run build` clean (68 modules). **6.3 code-complete (2026-07-08, builds ✅ / browser ⏳):** ToolCallWidget (SQL visible open-by-default while running + row count, collapsible, rows expandable), MarkdownRenderer (react-markdown + remark-gfm, GFM tables, HTML escaped), ResultChart (Recharts bar chart from a parsed markdown table — numeric column heuristic, survives reload; renders nothing if no table). `npm run build` clean. **6.4 code-complete (2026-07-08, builds ✅ / browser ⏳):** ConversationList/Item sidebar (select, most-recent), delete via ConfirmDialog → removes + drops active to empty chat (S6/FR-019), UsageBadge + useUsage (poll /usage/status every 20s + after each message), 429 composer banner (friendly message + resets-in + disable send + Try again) for S4/FR-021. `npm run build` clean. | Sub-steps: **6.1 ✅ · 6.2 ✅ · 6.3 ✅ · 6.4 ✅** — **full S1–S6 browser walkthrough passed (human, 2026-07-08)**. Phase 6 complete, awaiting human ✅. |
-| **7 — Polish** | README, full S1–S6 e2e, Helmet, audit review | 🚧 | **7.1 code-complete (2026-07-08, builds ✅ / runtime ⏳):** Helmet added (main.ts); secret sweep clean (no `sk-` keys, no secrets logged, `.env` untracked); audit coverage completed — `@Audit` on login/register/logout (reuses 3.3 pattern; interceptor now reads `req.auditUserId`); CORS allowlist+credentials & throttler & llm_reader confirmed; removed committed `frontend/vite.config.{js,d.ts}` build artifacts + gitignored; `.env.example` complete (superset of the Joi schema). build clean, unit 79/79. | Sub-steps: **7.1 build ✅ / runtime ⏳** · 7.2 README + reconcile ⬜ · 7.3 fresh-clone acceptance ⬜. Phase DoD: fresh clone → README only → working app. README = 10% of grade. |
+| **7 — Polish** | README, full S1–S6 e2e, Helmet, audit review | 🚧 | **7.1 code-complete (2026-07-08, builds ✅ / runtime ⏳):** Helmet added (main.ts); secret sweep clean (no `sk-` keys, no secrets logged, `.env` untracked); audit coverage completed — `@Audit` on login/register/logout (reuses 3.3 pattern; interceptor now reads `req.auditUserId`); CORS allowlist+credentials & throttler & llm_reader confirmed; removed committed `frontend/vite.config.{js,d.ts}` build artifacts + gitignored; `.env.example` complete (superset of the Joi schema). build clean, unit 79/79. **7.2 done (2026-07-08):** README rewritten to fresh-clone grade (prereqs, one-command setup, full env table root+frontend, run/test, architecture + doc links, S1–S6 how-to incl. the S4 limit tweak, security & trade-offs); PROGRESS reconciled — every requirement row ✅/🔍/deferred, **0 silent ⬜** (44 ✅ · 13 🔍 · 3 deferred). | Sub-steps: **7.1 build ✅ / runtime ⏳ · 7.2 ✅** · 7.3 fresh-clone acceptance ⬜. Phase DoD: fresh clone → README only → working app. README = 10% of grade. |
 
 **Overall:** `7 / 9` phases done (Phase 0–5 ✅; **Phase 6 🔍** — S1–S6 browser-verified, awaiting sign-off). Only Phase 7 (Polish) remains.
 
@@ -94,11 +94,11 @@
 | ID | Summary | Phase | Status |
 |----|---------|-------|--------|
 | NFR-001 | Low-latency streaming | 4b | ✅ |
-| NFR-002 | Polished UI | 6 | ⬜ |
-| NFR-003 | Well-separated modules | 1–5 | ⬜ |
+| NFR-002 | Polished UI | 6 | 🔍 |
+| NFR-003 | Well-separated modules | 1–5 | 🔍 |
 | NFR-004 | Docker Compose | 1 | ✅ |
 | NFR-005 | Redis for cache/usage | 1, 5 | ✅ |
-| NFR-006 | Complete README | 7 | ⬜ |
+| NFR-006 | Complete README | 7 | 🔍 |
 | NFR-007 | No dup/missing messages on refresh | 5 | ✅ |
 | NFR-008 | History in correct order | 3 | ✅ |
 | NFR-009 | Extensible architecture | 1 | ✅ |
@@ -115,8 +115,8 @@
 | CR-001/003/012 | Financial data accuracy / grounding | 4a, 4b | ✅ |
 | CR-002/018 | Append-only audit trail | 3, 4b | ✅ |
 | CR-004 | Access control on financial queries | 2, 4a | ✅ |
-| CR-005–008 | PDPA (consent, disclosure, erasure, breach) | 2, 3, 7 | ⬜ |
-| CR-009–011 | GDPR (by design, erasure, portability) | 2, 3 | ⬜ |
+| CR-005–008 | PDPA (consent, disclosure, erasure, breach) | 2, 3, 7 | 🚧 |
+| CR-009–011 | GDPR (by design, erasure, portability) | 2, 3 | 🔍 |
 | CR-013 | Disclose data source & coverage | 4b | ✅ |
 | CR-014 | OpenAI key never exposed | 1 | ✅ |
 | CR-015 | Spend tracking within $10 budget | 5 | ✅ |
@@ -135,12 +135,30 @@
 | GAP-006 | API key management | 1 | ✅ |
 | GAP-007 | Auth rate limiting | 2 | ✅ |
 | GAP-008 | Audit logging | 3 | ✅ |
-| GAP-009 | HTTPS/TLS (+ Secure cookie note) | 7 | ⬜ |
-| GAP-010 | Data retention / cleanup | 7 | ⬜ |
+| GAP-009 | HTTPS/TLS (+ Secure cookie note) | 7 | 🚧 |
+| GAP-010 | Data retention / cleanup | 7 | 🚧 |
 | GAP-011 | CORS config (credentials: true) | 1 | ✅ |
 | GAP-012 | Health endpoint | 1 | ✅ |
 | GAP-013 | DB connection pooling | 1 | ✅ |
-| GAP-014 | Test strategy | 1–7 | ⬜ |
+| GAP-014 | Test strategy | 1–7 | 🔍 |
+
+### Phase 7.2 reconciliation (evidence + deferred rationale)
+
+Every requirement row is now ✅, 🔍 (evidence below), or 🚧-**deferred** with a reason. No silent ⬜.
+
+**Flipped to 🔍 in 7.2 (evidence):**
+- **NFR-002 Polished UI** — full S1–S6 browser walkthrough passed (Phase 6); Tailwind + shadcn-style UI, streaming, SQL widget, tables/charts, sidebar, usage badge.
+- **NFR-003 Well-separated modules** — feature modules `auth/chat/financial/llm/usage/health/common/config`; `nest build` clean; module boundaries enforced (e.g. `llm_reader` isolated in `FinancialModule`).
+- **NFR-006 Complete README** — README rewritten to the fresh-clone guide (prereqs, one-command setup, env table, run/test, architecture, S1–S6 how-to, trade-offs).
+- **CR-009–011 GDPR** — privacy-by-design (per-user isolation → 404, minimal PII = email + display name), erasure via soft-delete (`deleted_at`), basic portability (GET conversation returns messages as JSON). Full DSAR tooling not built (not required at this scope).
+- **GAP-014 Test strategy** — Jest unit (79) + Supertest e2e across every module; guardrail attack matrix + genuine socket-sever interruption test.
+
+**🚧 Deferred (with reason — out of scope for a take-home, not blockers):**
+- **CR-005–008 PDPA** — *erasure* (soft-delete) and *disclosure* (CR-013 source disclosure) are implemented; **consent capture** and **breach-notification** pipelines are **deferred** (no user-facing consent flow / incident tooling in scope).
+- **GAP-009 HTTPS/TLS** — **deferred to deployment**: TLS terminates at a reverse proxy in prod; `COOKIE_SECURE` toggles the Secure flag and Helmet adds HSTS; `localhost` is a secure context for dev.
+- **GAP-010 Data retention / cleanup** — **deferred**: no retention/purge policy implemented; `audit_logs` are intentionally append-only (SOX §802); Redis usage/refresh keys self-expire via TTL.
+
+**Count:** 44 ✅ · 13 🔍 · 3 deferred (🚧 w/ reason) · **0 unaccounted** (60 requirement rows).
 
 ---
 
@@ -194,6 +212,7 @@
 
 | Date | Who | Phase | What happened | Blockers / follow-ups |
 |------|-----|-------|---------------|----------------------|
+| 2026-07-08 | assistant | 7.2 | README + reconcile (docs only): rewrote README.md to the fresh-clone guide (prereqs, one-command setup, env-var table root+frontend with descriptions, run/test/live-grounding, architecture summary + doc links, S1–S6 how-to with exact prompts incl. S4 limit tweak, security & trade-offs section). Reconciled PROGRESS: flipped NFR-002/003/006, CR-009–011, GAP-014 → 🔍 (evidence); CR-005–008, GAP-009, GAP-010 → 🚧-deferred with reasons in a new reconciliation subsection. 0 silent ⬜ (44 ✅ · 13 🔍 · 3 deferred). | 7.2 ✅ (docs self-reviewed). Next: 7.3 fresh-clone acceptance (human-run: clone → README only → e2e green → S1–S6 browser). |
 | 2026-07-08 | assistant | 7.1 | Security sweep + housekeeping: Helmet in main.ts; audit coverage completed (login/register/logout via existing @Audit + interceptor now reads req.auditUserId); secret grep clean; removed tracked vite build artifacts + gitignored; verified CORS/throttler/llm_reader; .env.example complete. build clean, unit 79/79. | 7.1 code ✅, **runtime DoD pending human**: `test:e2e` green, fresh-DB `migration:run`, `SELECT action,count(*) FROM audit_logs GROUP BY action` shows login/register/query/delete, `curl -I /api/health` shows Helmet headers. Next: 7.2 README. |
 | 2026-07-08 | human + assistant | 6 | **Full S1–S6 browser walkthrough passed.** Frontend complete (Vite/React/TS/Tailwind + Zustand): auth (in-memory token, silent refresh via Vite proxy), streaming chat (fetch+ReadableStream, Stop→partial), ToolCallWidget + markdown tables + Recharts, sidebar + delete-confirm, usage badge, friendly 429. Phase 6 + UI rows → 🔍 (FR-001/002/005/006/018/019/020/021, S5/S6). | Phase 6 🔍 awaiting human ✅. Then Phase 7 (Polish): README, full S1–S6 e2e, Helmet, audit review, optional recharts lazy-load / conversation auto-titling. |
 | 2026-07-08 | assistant | 6.4 | Sidebar + management: ConversationList/Item (select, delete via hand-rolled ConfirmDialog → S6/FR-019, active-deleted drops to empty chat), UsageBadge + useUsage (poll /usage/status every 20s + after send), 429 composer banner (message + resets-in + disable + Try again → S4/FR-021), ChatPage relaid out with left sidebar. `npm run build` clean (2609 modules). | 6.4 code ✅, **FINAL browser walkthrough pending human** (S1–S6 end-to-end). After that: flip FR-018/019/021 + S6 + Phase 6 → 🔍. | 
