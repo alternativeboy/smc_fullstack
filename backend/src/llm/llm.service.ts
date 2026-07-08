@@ -54,41 +54,59 @@ export class LlmService {
     let lastRows: unknown[] = [];
 
     for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
-      const stream = await this.openai.chat.completions.create(
-        {
-          model: this.model,
-          messages,
-          tools: [EXECUTE_SQL_TOOL],
-          stream: true,
-          stream_options: { include_usage: true },
-        },
-        { signal }, // aborts the HTTP request when the client disconnects
-      );
+      let stream;
+      try {
+        stream = await this.openai.chat.completions.create(
+          {
+            model: this.model,
+            messages,
+            tools: [EXECUTE_SQL_TOOL],
+            stream: true,
+            stream_options: { include_usage: true },
+          },
+          { signal }, // aborts the HTTP request when the client disconnects
+        );
+      } catch (err) {
+        if (signal?.aborted) {
+          return this.abortResult(messages, content, promptTokens, completionTokens, toolCalls, toolResults);
+        }
+        throw err;
+      }
 
       let roundContent = '';
       const acc: Record<number, ToolCallAcc> = {};
       let finishReason: string | null = null;
 
-      for await (const chunk of stream) {
-        if (chunk.usage) {
-          promptTokens += chunk.usage.prompt_tokens ?? 0;
-          completionTokens += chunk.usage.completion_tokens ?? 0;
+      try {
+        for await (const chunk of stream) {
+          if (chunk.usage) {
+            promptTokens += chunk.usage.prompt_tokens ?? 0;
+            completionTokens += chunk.usage.completion_tokens ?? 0;
+          }
+          const choice = chunk.choices?.[0];
+          if (!choice) continue;
+          const delta = choice.delta;
+          if (delta?.content) {
+            roundContent += delta.content;
+            content += delta.content;
+            yield { type: 'token', data: { content: delta.content } };
+          }
+          for (const tc of delta?.tool_calls ?? []) {
+            const entry = (acc[tc.index] ??= { id: '', name: '', arguments: '' });
+            if (tc.id) entry.id = tc.id;
+            if (tc.function?.name) entry.name = tc.function.name;
+            if (tc.function?.arguments) entry.arguments += tc.function.arguments;
+          }
+          if (choice.finish_reason) finishReason = choice.finish_reason;
         }
-        const choice = chunk.choices?.[0];
-        if (!choice) continue;
-        const delta = choice.delta;
-        if (delta?.content) {
-          roundContent += delta.content;
-          content += delta.content;
-          yield { type: 'token', data: { content: delta.content } };
+      } catch (err) {
+        // Client disconnected mid-stream → return a partial with a fair cost.
+        if (signal?.aborted) {
+          const result = this.abortResult(messages, content, promptTokens, completionTokens, toolCalls, toolResults);
+          yield { type: 'usage', data: { promptTokens: result.promptTokens, completionTokens: result.completionTokens, cost: result.cost } };
+          return result;
         }
-        for (const tc of delta?.tool_calls ?? []) {
-          const entry = (acc[tc.index] ??= { id: '', name: '', arguments: '' });
-          if (tc.id) entry.id = tc.id;
-          if (tc.function?.name) entry.name = tc.function.name;
-          if (tc.function?.arguments) entry.arguments += tc.function.arguments;
-        }
-        if (choice.finish_reason) finishReason = choice.finish_reason;
+        throw err;
       }
 
       const rounds = Object.values(acc);
@@ -144,14 +162,48 @@ export class LlmService {
         this.logger.warn(`Output validator: ${outcome.warnings.join('; ')}`);
       }
       yield { type: 'usage', data: { promptTokens, completionTokens, cost } };
-      return { content, promptTokens, completionTokens, cost, toolCalls, toolResults };
+      return { content, promptTokens, completionTokens, cost, toolCalls, toolResults, partial: false };
     }
 
     // Tool-loop budget exhausted — return what we have.
     this.logger.warn(`Tool loop hit MAX_TOOL_ROUNDS (${MAX_TOOL_ROUNDS})`);
     const cost = calculateCost(promptTokens, completionTokens);
     yield { type: 'usage', data: { promptTokens, completionTokens, cost } };
-    return { content, promptTokens, completionTokens, cost, toolCalls, toolResults };
+    return { content, promptTokens, completionTokens, cost, toolCalls, toolResults, partial: false };
+  }
+
+  /**
+   * Fair partial cost on abort (FR-016/017). OpenAI's usage chunk only arrives at
+   * a round's end, so on a mid-stream disconnect we estimate uncounted tokens from
+   * text length (~4 chars/token — a documented approximation; a tokenizer would be
+   * marginally more precise but the exact usage is unavailable either way). Prompt
+   * tokens fall back to an estimate of the sent messages when no round completed.
+   */
+  private abortResult(
+    messages: ChatCompletionMessageParam[],
+    content: string,
+    promptTokens: number,
+    completionTokens: number,
+    toolCalls: unknown[],
+    toolResults: unknown[],
+  ): StreamResult {
+    const producedCompletion = Math.max(completionTokens, this.estimateTokens(content));
+    const estimatedPrompt =
+      promptTokens > 0 ? promptTokens : this.estimateTokens(messages.map((m) => (typeof m.content === 'string' ? m.content : '')).join('\n'));
+    const cost = calculateCost(estimatedPrompt, producedCompletion);
+    return {
+      content,
+      promptTokens: estimatedPrompt,
+      completionTokens: producedCompletion,
+      cost,
+      toolCalls,
+      toolResults,
+      partial: true,
+    };
+  }
+
+  private estimateTokens(text: string): number {
+    return Math.ceil((text ?? '').length / 4);
   }
 
   private parseQuery(args: string): string {

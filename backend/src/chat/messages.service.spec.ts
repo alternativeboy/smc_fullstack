@@ -8,6 +8,8 @@ function fakeRes() {
   return {
     writes,
     writableEnded: false,
+    destroyed: false,
+    writable: true,
     write: (s: string) => writes.push(s),
   } as any;
 }
@@ -22,7 +24,7 @@ function stubLlm(events: StreamEvent[], opts: { throwWhile?: () => boolean; resu
         yield e;
       }
       if (opts.throwWhile?.()) throw new Error('aborted');
-      return opts.result ?? ({ content: '', promptTokens: 0, completionTokens: 0, cost: 0, toolCalls: [], toolResults: [] } as StreamResult);
+      return opts.result ?? ({ content: '', promptTokens: 0, completionTokens: 0, cost: 0, toolCalls: [], toolResults: [], partial: false } as StreamResult);
     },
   } as any;
 }
@@ -50,7 +52,7 @@ const events: StreamEvent[] = [
 describe('MessagesService', () => {
   it('persists user + final assistant message + audit, emits done', async () => {
     const llm = stubLlm(events, {
-      result: { content: "Apple's net income was $96.99B.", promptTokens: 900, completionTokens: 25, cost: 0.00248, toolCalls: [], toolResults: [] },
+      result: { content: "Apple's net income was $96.99B.", promptTokens: 900, completionTokens: 25, cost: 0.00248, toolCalls: [], toolResults: [], partial: false },
     });
     const { service, messages, audit, usage } = makeService(llm);
     const res = fakeRes();
@@ -66,19 +68,24 @@ describe('MessagesService', () => {
     expect(res.writes.join('')).toContain('event: done');
   });
 
-  it('on client abort saves a PARTIAL assistant message (is_partial=true)', async () => {
-    const ac = new AbortController();
-    // Throw after the first token, with the signal already aborted.
-    let count = 0;
-    const llm = stubLlm(events, { throwWhile: () => (++count > 1 ? (ac.abort(), true) : false) });
-    const { service, messages } = makeService(llm);
+  it('saves a PARTIAL assistant message + charges partial cost when LlmService returns partial', async () => {
+    const llm = stubLlm(
+      [
+        { type: 'token', data: { content: 'Apple' } },
+        { type: 'usage', data: { promptTokens: 600, completionTokens: 2, cost: 0.00152 } },
+      ],
+      { result: { content: 'Apple', promptTokens: 600, completionTokens: 2, cost: 0.00152, toolCalls: [], toolResults: [], partial: true } },
+    );
+    const { service, messages, usage } = makeService(llm);
     const res = fakeRes();
 
-    await service.stream({ conversationId: 'c1', userId: 'u1', userContent: 'q', res, signal: ac.signal });
+    await service.stream({ conversationId: 'c1', userId: 'u1', userContent: 'q', res, signal: new AbortController().signal });
 
     const assistant = messages.save.mock.calls.map((c) => c[0]).find((m) => m.role === 'assistant');
     expect(assistant).toBeDefined();
     expect(assistant.isPartial).toBe(true);
+    expect(usage.track).toHaveBeenCalledWith('u1', 0.00152); // partial charge (FR-017)
+    expect(res.writes.join('')).not.toContain('event: done'); // client is gone
   });
 
   it('on OpenAI failure (not aborted) emits event:error and does not crash', async () => {

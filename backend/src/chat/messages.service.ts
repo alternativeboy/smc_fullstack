@@ -77,6 +77,12 @@ export class MessagesService {
         next = await gen.next();
       }
 
+      // LlmService handles the abort internally and returns partial:true with a
+      // fair partial cost (FR-016/017). Persist + charge either way.
+      const isPartial = next.value.partial;
+      if (isPartial) {
+        this.logger.warn(`Stream aborted (conversation ${conversationId}); saving partial`);
+      }
       const saved = await this.saveAssistant(conversationId, {
         content,
         toolCalls,
@@ -84,33 +90,20 @@ export class MessagesService {
         promptTokens,
         completionTokens,
         cost,
-        isPartial: false,
+        isPartial,
       });
-      await this.writeAudit(userId, toolResults, cost, false);
-      await this.usage.track(userId, cost); // charge the produced cost (FR-009)
-      this.write(res, { type: 'done', data: { messageId: saved.id } });
-    } catch (err) {
-      if (signal.aborted) {
-        // Client disconnected mid-stream (FR-016/017 groundwork; full verify in Phase 5).
-        this.logger.warn(`Stream aborted (conversation ${conversationId}); saving partial`);
-        await this.saveAssistant(conversationId, {
-          content,
-          toolCalls,
-          toolResults,
-          promptTokens,
-          completionTokens,
-          cost,
-          isPartial: true,
-        });
-        await this.writeAudit(userId, toolResults, cost, true);
-      } else {
-        // OpenAI/pipeline failure (GAP-005) — never crash; tell the client cleanly.
-        this.logger.error(`LLM stream failed: ${err instanceof Error ? err.message : String(err)}`);
-        this.write(res, {
-          type: 'error',
-          data: { message: 'The assistant is temporarily unavailable. Please try again.' },
-        });
+      await this.writeAudit(userId, toolResults, cost, isPartial);
+      await this.usage.track(userId, cost); // charge produced cost — full or partial (FR-009/017)
+      if (!isPartial) {
+        this.write(res, { type: 'done', data: { messageId: saved.id } });
       }
+    } catch (err) {
+      // Genuine OpenAI/pipeline failure (GAP-005) — never crash; tell the client.
+      this.logger.error(`LLM stream failed: ${err instanceof Error ? err.message : String(err)}`);
+      this.write(res, {
+        type: 'error',
+        data: { message: 'The assistant is temporarily unavailable. Please try again.' },
+      });
     }
   }
 
@@ -176,7 +169,13 @@ export class MessagesService {
   }
 
   private write(res: Response, event: StreamEvent): void {
-    if (res.writableEnded) return;
-    res.write(`event: ${event.type}\ndata: ${JSON.stringify(event.data)}\n\n`);
+    // On a severed socket res.write() throws — swallow it so persistence still
+    // runs (the partial must be saved even though the client is gone).
+    if (res.writableEnded || res.destroyed || !res.writable) return;
+    try {
+      res.write(`event: ${event.type}\ndata: ${JSON.stringify(event.data)}\n\n`);
+    } catch {
+      /* client disconnected — ignore */
+    }
   }
 }
