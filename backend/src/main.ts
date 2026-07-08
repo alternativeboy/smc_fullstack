@@ -2,11 +2,16 @@ import { ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
 import cookieParser from 'cookie-parser';
+import helmet from 'helmet';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   const config = app.get(ConfigService);
+
+  // Security headers (defense-in-depth). API-only, so the default CSP doesn't
+  // affect the SSE stream or CORS.
+  app.use(helmet());
 
   // All routes under /api (matches openapi_spec.yaml)
   app.setGlobalPrefix('api');

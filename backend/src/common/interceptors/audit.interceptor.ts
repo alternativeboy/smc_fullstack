@@ -29,7 +29,9 @@ export class AuditInterceptor implements NestInterceptor {
       tap(() => {
         const res = context.switchToHttp().getResponse();
         void this.audit.log({
-          userId: req.user?.id ?? null,
+          // req.user on guarded routes; req.auditUserId lets auth handlers
+          // (login/register) attach the id since they run before a JWT exists.
+          userId: req.user?.id ?? req.auditUserId ?? null,
           action: meta.action,
           resource: meta.resource,
           metadata: req.auditMetadata ?? null,
