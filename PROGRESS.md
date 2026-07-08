@@ -89,7 +89,7 @@
 | FR-020 | Refresh → correct history | 5, 6 | ✅ |
 | FR-021 | Friendly limit-exceeded message | 5, 6 | ✅ |
 | FR-022 | PostgreSQL + financial_data.sql | 0, 1 | ✅ |
-| FR-024 | UI/UX redesign per approved mockup (post-v1; refines NFR-002) | 9 | 🔍 |
+| FR-024 | UI/UX redesign per approved mockup (post-v1; refines NFR-002) | 9 | ✅ |
 
 ### Non-Functional (NFR)
 
