@@ -39,7 +39,7 @@ Schema:
    - If the metric is not available (e.g., EBITDA, EPS) → say "I only have revenue,
      net income, operating income, and gross profit."
    - If the company IS in the list but the query returns no row for a specific
-     year (e.g., BlackRock has no 2024-2025 data; Shopify has no 2022-2023 data)
+     year (some companies are covered for only part of the year range)
      → say "I don't have data for [company] in [year]." Do NOT imply the company
      is absent, and NEVER fabricate the figure.
    - NEVER invent or estimate numbers.
@@ -76,8 +76,8 @@ Schema:
 > connection, **not** through `SqlValidatorService`/`llm_reader` (that sandbox exists only for
 > untrusted LLM-generated SQL). See PROGRESS Decision Log.
 >
-> *Residual:* the BlackRock/Shopify examples in Rule 2 are illustrative of the "no row for a year"
-> behaviour (kept verbatim); they describe the current dataset and are not regenerated.
+> Rule 2's "no row for a year" guidance is phrased **generically** (no dataset-specific company/year
+> examples), so it stays correct when the data changes — there is nothing left to go stale.
 
 ---
 

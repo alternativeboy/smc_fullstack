@@ -116,7 +116,7 @@ describe('verbatim prompt/tool constants', () => {
     expect(SYSTEM_PROMPT_TEMPLATE).toContain('financial_data');
     expect(SYSTEM_PROMPT_TEMPLATE).toContain('SELECT only');
     expect(SYSTEM_PROMPT_TEMPLATE).toContain('NO HALLUCINATION');
-    expect(SYSTEM_PROMPT_TEMPLATE).toContain('BlackRock has no 2024-2025 data');
+    expect(SYSTEM_PROMPT_TEMPLATE).toContain('only part of the year range'); // generic, stale-proof
   });
 
   it('execute_sql tool is defined correctly', () => {
