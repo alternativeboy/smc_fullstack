@@ -6,6 +6,7 @@ import { Repository } from 'typeorm';
 import { AuditService } from '../common/services/audit.service';
 import { LlmService } from '../llm/llm.service';
 import { ConversationTurn, StreamEvent } from '../llm/interfaces/stream-event.interface';
+import { UsageService } from '../usage/usage.service';
 import { ChatService } from './chat.service';
 import { Message } from './entities/message.entity';
 
@@ -26,6 +27,7 @@ export class MessagesService {
     private readonly chat: ChatService,
     private readonly llm: LlmService,
     private readonly audit: AuditService,
+    private readonly usage: UsageService,
     private readonly config: ConfigService,
   ) {}
 
@@ -85,6 +87,7 @@ export class MessagesService {
         isPartial: false,
       });
       await this.writeAudit(userId, toolResults, cost, false);
+      await this.usage.track(userId, cost); // charge the produced cost (FR-009)
       this.write(res, { type: 'done', data: { messageId: saved.id } });
     } catch (err) {
       if (signal.aborted) {

@@ -13,11 +13,13 @@ import {
 import type { Request, Response } from 'express';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { AuthUser, CurrentUser } from '../common/decorators/current-user.decorator';
+import { UsageLimitGuard } from '../usage/guards/usage-limit.guard';
 import { CreateMessageDto } from './dto/create-message.dto';
 import { MessagesService } from './messages.service';
 
+// JwtAuthGuard first (sets req.user), then the pre-flight usage check (FR-021).
 @Controller('conversations/:id/messages')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, UsageLimitGuard)
 export class MessagesController {
   constructor(private readonly messages: MessagesService) {}
 

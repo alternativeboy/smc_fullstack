@@ -23,7 +23,7 @@ Backend is built in verifiable phases (see [`PROGRESS.md`](PROGRESS.md)). **6 / 
 | 3 | Chat CRUD + user isolation (404) + append-only audit | ✅ |
 | 4a | SQL guardrails — validator (Layer 2) + `llm_reader` execution (Layer 3) | ✅ |
 | 4b | LLM streaming — OpenAI + `execute_sql` tool loop + SSE (grounding verified live on gpt-4o) | ✅ |
-| 5 | Usage limits + interruption (partial-save) | ⬜ next |
+| 5 | Usage limits + interruption (partial-save) | 🚧 5.1 done (limits/429); 5.2 interruption next |
 | 6 | Frontend (React) | ⬜ |
 | 7 | Polish | ⬜ |
 

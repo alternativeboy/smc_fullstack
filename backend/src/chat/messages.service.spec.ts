@@ -35,9 +35,10 @@ function makeService(llm: any) {
   };
   const chat = { assertOwned: jest.fn() };
   const audit = { log: jest.fn() };
+  const usage = { track: jest.fn() };
   const config = { getOrThrow: jest.fn(() => 'gpt-4o-mini') } as unknown as ConfigService;
-  const service = new MessagesService(messages as any, chat as any, llm, audit as any, config);
-  return { service, messages, audit };
+  const service = new MessagesService(messages as any, chat as any, llm, audit as any, usage as any, config);
+  return { service, messages, audit, usage };
 }
 
 const events: StreamEvent[] = [
@@ -51,7 +52,7 @@ describe('MessagesService', () => {
     const llm = stubLlm(events, {
       result: { content: "Apple's net income was $96.99B.", promptTokens: 900, completionTokens: 25, cost: 0.00248, toolCalls: [], toolResults: [] },
     });
-    const { service, messages, audit } = makeService(llm);
+    const { service, messages, audit, usage } = makeService(llm);
     const res = fakeRes();
 
     await service.stream({ conversationId: 'c1', userId: 'u1', userContent: 'q', res, signal: new AbortController().signal });
@@ -61,6 +62,7 @@ describe('MessagesService', () => {
     expect(saved[1]).toMatchObject({ role: 'assistant', isPartial: false, completionTokens: 25 });
     expect(saved[1].cost).toBe('0.00248');
     expect(audit.log).toHaveBeenCalledWith(expect.objectContaining({ action: 'query', resource: 'financial_data' }));
+    expect(usage.track).toHaveBeenCalledWith('u1', 0.00248);
     expect(res.writes.join('')).toContain('event: done');
   });
 

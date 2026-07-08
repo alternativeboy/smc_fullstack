@@ -1,7 +1,7 @@
 # 📊 PROGRESS — Financial Data Chat Assistant
 
 > Single source of truth for project status. Read by both the human and the agent.
-> Last updated: 2026-07-08 · Updated by: human (Phase 4b sign-off)
+> Last updated: 2026-07-08 · Updated by: assistant (Phase 5.1 session)
 
 ---
 
@@ -36,7 +36,7 @@
 | **3 — Chat CRUD + isolation** | Entities + migrations, CRUD per OpenAPI, soft-delete, ownership → 404 | ✅ | **3.1 done (human-verified 2026-07-07):** `nest build` + migration `tsc` clean; `migration:run` created `conversations`/`messages`/`audit_logs`; `\d` on each matches erd.md (FKs: conversations→users CASCADE, messages→conversations CASCADE, audit_logs→users SET NULL; `numeric(10,6)` cost; soft-delete `deleted_at`; all indexes); `migration:revert`+re-run clean; `llm_reader` SELECT on all three → `permission denied`. **3.2 done (human-verified 2026-07-07):** build clean; unit 20/20 (chat: list scoping, getOne/getMessages/softDelete→404 on foreign id, owned delete); `test:e2e` green — CRUD (create 201 'New Chat' → paginated list → get empty messages → delete 200 {message} → gone + 404); **cross-user isolation: B gets 404 on A's conv for get/messages/delete, absent from B's list**; message ordering (seeded out-of-order → first/second/third, NFR-008). **3.3 done (human-verified 2026-07-07):** append-only AuditService (insert-only, unit-tested for no update/delete) + `@Audit` decorator + AuditInterceptor (logs on success only); delete route audited. unit 22/22; `test:e2e` S6 green — delete→200 → `delete_conversation` audit row (userId + metadata.messageCount=2) → conversation 404/hidden → **messages RETAINED** (soft-delete, no cascade); cross-user delete → 404 + NO audit row. | Sub-steps: **3.1 ✅ · 3.2 ✅ · 3.3 ✅** — Phase 3 human-reviewed & signed off ✅ 2026-07-07. |
 | **4a — SQL guardrails** | `SqlValidatorService` + FinancialModule via `llm_reader` | ✅ | **4a.1 done (self-verified 2026-07-07, no DB):** `nest build` clean; `sql-validator.service.spec.ts` **41 tests green** (full suite 63/63). Blocks: all 14 keywords incl. mixed-case, stacked `;`, line/block comments, `pg_`/`pg_sleep`/`information_schema`, `users`/`conversations`/`messages`/`audit_logs` direct + via JOIN/UNION exfil, no-`financial_data` queries. Passes: CTE, aggregates, GROUP/ORDER BY, LIMIT, and blocked-words-in-string-literals (strengthening). **4a.2 done (human-verified 2026-07-07):** FinancialModule with a SECOND named `llm_reader` DataSource (statement_timeout 5s), FinancialData entity (read-only), FinancialService (Layer 2 validate → Layer 3 execute → 200-row cap + truncated). unit 66/66; `test:e2e` green — valid SELECT returns rows, cross-join capped at 200/truncated, **raw INSERT/UPDATE/DELETE via llm_reader → `permission denied` (Layer 3 independent of validator)**, `SELECT users` denied, `pg_sleep(10)` aborted by statement_timeout. | Sub-steps: **4a.1 ✅ · 4a.2 ✅** — Phase 4a human-reviewed & signed off ✅ 2026-07-07. |
 | **4b — LLM streaming** | OpenAI stream + tool loop, SSE protocol, save message/cost/audit | ✅ | **4b.1 done (self-verified 2026-07-08, no DB/API — $0):** LlmModule building blocks — system prompt + execute_sql tool VERBATIM from prompt_spec (asserted, incl. new missing-year rule), StreamEvent interface, PromptBuilder, OutputValidator (Layer 4, log-only), cost helper (§5 pricing), `llm.service.ts` tool-loop generator. `nest build` clean; full suite **70/70**; mocked-OpenAI tests cover full S1 exchange (tool_call→execute→tool_result→answer→usage, cost asserted) + validator-rejection fed back without crash. **4b.2 done (human-verified 2026-07-08, mocked OpenAI — $0):** `POST /conversations/:id/messages` (JWT-guarded, ownership→404), MessagesService orchestrates stream→SSE→persist. e2e (38 passing): ordered SSE tool_call/tool_result/token/usage/done, user+assistant messages persisted (cost≈$0.0048, tool_calls, is_partial=false), audit `query` row written, cross-user→404. Unit: abort→partial (is_partial=true) save, OpenAI failure→`event:error` no crash. maxRetries=2 (GAP-005). **4b.3 done (human-run live, 2026-07-08):** S1/S2 verified end-to-end on gpt-4o-mini AND gpt-4o. All grounded correctly (numbers match DB): S1 single Apple 2023 = $96,995,000,000; S1 table = 15 tech companies 2024 exact; S2 Toyota → "I don't have data"; S2 2020 → "only 2022-2025"; S2 EBITDA → lists 4 metrics; **missing-year Shopify 2022 → "I don't have data for Shopify in 2022"** (rule works). Source disclosed (CR-013). Cost/audit persisted. Budget logged §4. | Sub-steps: **4b.1 ✅ · 4b.2 ✅ · 4b.3 ✅** — Phase 4b human-reviewed & signed off ✅ 2026-07-08. |
-| **5 — Usage + interruption** | Redis usage + guard, partial-save on abort | ⬜ | — | DoD: S3, S4, S5 (kill connection mid-stream for real) |
+| **5 — Usage + interruption** | Redis usage + guard, partial-save on abort | 🚧 | **5.1 done (human-verified 2026-07-08, $0):** UsageModule — `usage.service.ts` (atomic `INCRBYFLOAT` + EXPIRE-on-first, TTL reset, limit/interval from config), `UsageLimitGuard` (pre-flight → friendly 429 UsageLimitError + resetAt), `GET /usage/status`; charge on normal completion. unit 79/79 (TTL window integrity, atomic no-read-modify-write, getStatus math); `test:e2e` — **S4**: message charges usage → exhaust → 429 friendly body; concurrent 20× track() sums exactly (real Redis atomicity). | Sub-steps: **5.1 ✅** · 5.2 interruption (partial charge + real socket kill S3/S5) ⬜. Phase DoD: S3/S4/S5 with a genuinely severed connection. |
 | **6 — Frontend** | Auth pages, chat + `useStreamChat`, ToolCallWidget, Markdown/charts, sidebar, usage badge | ⬜ | — | DoD: human clicks through every scenario in a browser |
 | **7 — Polish** | README, full S1–S6 e2e, Helmet, audit review | ⬜ | — | README = 10% of grade |
 
@@ -51,7 +51,7 @@
 | S1 | Successful query → grounded, streamed answer | 4b | ✅ | Live gpt-4o: single value (Apple 2023 net income $96.99B, matches DB) + table (15 tech cos 2024, all exact) |
 | S2 | Data not available → clearly stated, no fabrication | 4b | ✅ | Live gpt-4o: Toyota / 2020 / EBITDA / Shopify-2022 all declined correctly, no fabrication |
 | S3 | Stop mid-generation → partial saved, cost charged | 5 | ⬜ | — |
-| S4 | Usage limit exceeded → friendly 429 | 5 | ⬜ | — |
+| S4 | Usage limit exceeded → friendly 429 | 5 | 🔍 | usage.e2e: exhausted budget → POST message pre-flight → 429 UsageLimitError (error/message with $limit/resetAt) |
 | S5 | Browser refresh mid-stream → history intact, no dup/loss | 5, 6 | ⬜ | — |
 | S6 | Delete conversation → confirmation, ownership, audit | 3, 6 | 🚧 | Backend ✅ (delete→200→audit row→404/hidden→messages retained; cross-user→404+no audit). Remaining: confirmation dialog (Phase 6). |
 
@@ -74,9 +74,9 @@
 | FR-006 | Markdown render (tables, charts) | 6 | ⬜ |
 | FR-007 | Grounding — DB only, no hallucination | 4a, 4b | ✅ |
 | FR-008 | Missing data stated clearly | 4b | ✅ |
-| FR-009 | Spending limit per user (default $1) | 5 | ⬜ |
-| FR-010 | Limit reset on fixed interval | 5 | ⬜ |
-| FR-011 | Configurable limit & interval | 5 | ⬜ |
+| FR-009 | Spending limit per user (default $1) | 5 | 🔍 |
+| FR-010 | Limit reset on fixed interval | 5 | 🔍 |
+| FR-011 | Configurable limit & interval | 5 | 🔍 |
 | FR-012 | User registration | 2 | ✅ |
 | FR-013 | User login | 2 | ✅ |
 | FR-014 | User isolation | 3 | ✅ |
@@ -86,7 +86,7 @@
 | FR-018 | Revisit past conversations | 3, 6 | 🚧 |
 | FR-019 | Delete with confirmation | 3, 6 | 🚧 |
 | FR-020 | Refresh → correct history | 5, 6 | ⬜ |
-| FR-021 | Friendly limit-exceeded message | 5, 6 | ⬜ |
+| FR-021 | Friendly limit-exceeded message | 5, 6 | 🔍 |
 | FR-022 | PostgreSQL + financial_data.sql | 0, 1 | ✅ |
 
 ### Non-Functional (NFR)
@@ -97,7 +97,7 @@
 | NFR-002 | Polished UI | 6 | ⬜ |
 | NFR-003 | Well-separated modules | 1–5 | ⬜ |
 | NFR-004 | Docker Compose | 1 | ✅ |
-| NFR-005 | Redis for cache/usage | 1, 5 | 🚧 |
+| NFR-005 | Redis for cache/usage | 1, 5 | 🔍 |
 | NFR-006 | Complete README | 7 | ⬜ |
 | NFR-007 | No dup/missing messages on refresh | 5 | ⬜ |
 | NFR-008 | History in correct order | 3 | ✅ |
@@ -119,7 +119,7 @@
 | CR-009–011 | GDPR (by design, erasure, portability) | 2, 3 | ⬜ |
 | CR-013 | Disclose data source & coverage | 4b | ✅ |
 | CR-014 | OpenAI key never exposed | 1 | ✅ |
-| CR-015 | Spend tracking within $10 budget | 5 | ⬜ |
+| CR-015 | Spend tracking within $10 budget | 5 | 🔍 |
 | CR-016 | Hybrid token storage + rotation | 2 | ✅ |
 | CR-017 | CORS allowlist + credentials | 1 | ✅ |
 
@@ -180,6 +180,7 @@
 | 2026-07-07 | Audit via reusable `@Audit` decorator + AuditInterceptor (logs on success only) | Declarative, reusable for later phases; success-only tap means a 404 (foreign id) writes NO audit row. AuditService is insert-only (append-only, CR-002/018). | backend/src/common/{decorators/audit.decorator,interceptors/audit.interceptor,services/audit.service}.ts |
 | 2026-07-08 | Added missing-year rule to prompt_spec §1 Rule 2 (human-approved) | Company-listed + year-in-range + no row (BlackRock 2024–25, Shopify 2022–23) → "no data for [company] in [year]", not company-absent, no fabrication. Strengthens grounding (FR-008/CR-013). Prereq for 4b.1's verbatim system-prompt copy. | docs/prompt_spec.md §1 |
 | 2026-07-08 | LlmService tool loop calls `FinancialService.execute()` (single Layer 2+3 choke point), not validate-then-execute separately | Avoids double validation; FinancialService already enforces Layer 2 (validator) + Layer 3 (llm_reader). A rejection surfaces as a thrown error fed back to the model as the tool result. | backend/src/llm/llm.service.ts |
+| 2026-07-08 | UsageService reads TTL **sequentially after** INCRBYFLOAT (not the prompt_spec §5 `Promise.all`) | A parallel TTL read can hit before the key exists → returns -2, so the EXPIRE-on-first never fires and the key would never reset. Sequential read reports -1 on a new key. | backend/src/usage/usage.service.ts |
 | 2026-07-07 | SqlValidator scans keyword/table/`;`/comment on a **string-literal-blanked** copy of the SQL | Strengthening over prompt_spec §3's raw-regex: prevents false positives when a blocked word appears as DATA (e.g. `company = 'Drop Inc'`). Does NOT weaken security — Layer 3 (llm_reader) is still the real guarantee. **Proposed prompt_spec §3 update** for human review. | backend/src/llm/services/sql-validator.service.ts |
 
 ---
@@ -190,6 +191,7 @@
 
 | Date | Who | Phase | What happened | Blockers / follow-ups |
 |------|-----|-------|---------------|----------------------|
+| 2026-07-08 | human + assistant | 5.1 | Usage tracking + limit guard: `usage/` module (UsageService atomic INCRBYFLOAT+TTL, UsageLimitGuard pre-flight 429, GET /usage/status), charge on completion wired into MessagesService. Guard order JwtAuthGuard→UsageLimitGuard on the message endpoint. Fixed a flaky S4 e2e (process.env override of USAGE_LIMIT leaked across e2e files — rewrote S4 to exhaust via `track()`, no env mutation; this also fixed a messages.e2e 403). Verified: build clean, unit 79/79, human ran `test:e2e` → S4 429 + concurrency atomic. $0 spent. On `feat/Phase5_*`. | 5.1 ✅ (FR-009/010/011/021, NFR-005, CR-015 🔍; S4 🔍). Next: 5.2 (partial charge on abort + real socket-kill S3/S5). Commit 5.1. |
 | 2026-07-08 | human | 4b | Reviewed & signed off Phase 4b → row + requirement rows to ✅ (FR-004/007/008, NFR-001/010, CR-001/003/012, CR-013, GAP-005, S1, S2). Kept FR-005 🚧 (tool-call UI = Phase 6). Committed 4b on `feat/Phase4b_LLM_Streaming`, opened PR; set OPENAI_MODEL back to gpt-4o-mini. Overall 6/9. Synced README.md + CATCHUP.md. | Next: Phase 5 (usage limits + interruption / S5 real abort). |
 | 2026-07-08 | human + assistant | 4b.3 | Live S1/S2 grounding via `scripts/live-grounding.ts` (drives the real SSE endpoint). Human ran both gpt-4o-mini and gpt-4o. **All 6 scenarios grounded correctly on both models** — figures match the DB exactly; missing-year rule confirmed (Shopify 2022 → "no data", not fabricated); source disclosed. Real spend ~$0.030 total (well under $10). No prompt/tool changes made. **Phase 4b complete → 🔍 overall.** On `feat/Phase4b_*`. | 4b.3 ✅ (S1/S2, FR-004/007/008, CR-001/003/012/013, NFR-001 🔍; FR-005 🚧 UI Phase 6). Awaiting human review Phase 4b → ✅. Next: Phase 5 (usage limits + interruption). |
 | 2026-07-08 | human + assistant | 4b.2 | SSE endpoint + persistence + abort: `chat/messages.controller.ts` (POST /conversations/:id/messages, JWT-guarded, @Res SSE, @HttpCode 200, req 'close'→abort), `messages.service.ts` (buildHistory→save user→stream events→persist assistant+audit; abort→partial; failure→event:error). Added AbortSignal to LlmService.streamChat; OpenAI maxRetries=2. Wired MessagesController/Service into ChatModule (imports LlmModule). Verified: build clean, unit 73/73, human ran `test:e2e` → 38 passing incl. new Messages SSE suite (persistence, audit, 404). $0 spent (OpenAI mocked). On `feat/Phase4b_*`. | 4b.2 ✅ (NFR-010, GAP-005 🔍). Next: 4b.3 (live gpt-4o S1/S2 — the only budget step). Commit 4b.2. Budget spent so far: $0. |
