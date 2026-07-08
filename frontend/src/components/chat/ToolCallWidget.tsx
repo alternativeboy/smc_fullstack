@@ -18,7 +18,7 @@ export function ToolCallWidget({ toolCall, toolResult, running }: Props) {
   const [open, setOpen] = useState(true);
 
   return (
-    <div className="max-w-[640px] overflow-hidden rounded-2xl border bg-[oklch(0.985_0.004_90)]">
+    <div className="max-w-[640px] animate-in fade-in overflow-hidden rounded-2xl border bg-[oklch(0.985_0.004_90)] duration-300">
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
@@ -42,7 +42,7 @@ export function ToolCallWidget({ toolCall, toolResult, running }: Props) {
       </button>
 
       {open && (
-        <div className="border-t">
+        <div className="animate-in fade-in slide-in-from-top-1 border-t duration-200">
           <pre className="overflow-x-auto whitespace-pre-wrap bg-[oklch(0.22_0.02_250)] px-4 py-3.5 font-mono text-[13px] leading-relaxed text-[oklch(0.85_0.02_155)]">
             {toolCall.arguments}
           </pre>

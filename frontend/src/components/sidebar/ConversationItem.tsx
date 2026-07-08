@@ -13,7 +13,7 @@ export function ConversationItem({ conversation, active, onSelect, onDelete }: P
   return (
     <div
       className={cn(
-        'group flex cursor-pointer items-center justify-between gap-2 rounded-[10px] px-3 py-2 text-[13.5px] transition-colors',
+        'group flex cursor-pointer items-center justify-between gap-2 rounded-[10px] px-3 py-2 text-[13.5px] transition active:scale-[0.99]',
         active
           ? 'bg-secondary font-semibold text-secondary-foreground'
           : 'text-muted-foreground hover:bg-muted',

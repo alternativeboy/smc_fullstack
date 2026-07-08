@@ -1,13 +1,20 @@
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { cn } from '@/lib/utils';
 
 /**
  * FR-006 — renders the assistant's markdown (GFM tables, code, lists). react-markdown
  * escapes raw HTML by default (no rehype-raw) so untrusted HTML is not injected.
  */
-export function MarkdownRenderer({ content }: { content: string }) {
+export function MarkdownRenderer({ content, caret }: { content: string; caret?: boolean }) {
   return (
-    <div className="prose prose-sm max-w-none text-foreground prose-p:my-2 prose-p:leading-relaxed prose-p:text-foreground prose-strong:text-foreground [&_td:first-child]:font-semibold">
+    <div
+      className={cn(
+        'prose prose-sm max-w-none text-foreground prose-p:my-2 prose-p:leading-relaxed prose-p:text-foreground prose-strong:text-foreground [&_td:first-child]:font-semibold',
+        // While streaming, inline the last block so the blinking caret hugs the text.
+        caret && '[&>*:nth-last-child(2)]:inline',
+      )}
+    >
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={{
@@ -32,6 +39,9 @@ export function MarkdownRenderer({ content }: { content: string }) {
       >
         {content}
       </ReactMarkdown>
+      {caret && (
+        <span className="ml-0.5 inline-block h-[1.05em] w-[2px] translate-y-[3px] animate-caret bg-foreground/60 align-baseline" />
+      )}
     </div>
   );
 }

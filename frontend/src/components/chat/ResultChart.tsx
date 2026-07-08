@@ -12,7 +12,7 @@ export function ResultChart({ content }: { content: string }) {
   if (!chart) return null;
 
   return (
-    <div className="max-w-[640px] rounded-2xl border bg-card p-5 shadow-sm">
+    <div className="max-w-[640px] animate-in fade-in rounded-2xl border bg-card p-5 shadow-sm duration-300">
       <p className="mb-3 text-[13.5px] font-bold text-foreground">{chart.valueLabel}</p>
       <ResponsiveContainer width="100%" height={200}>
         <BarChart data={chart.data} margin={{ top: 22, right: 8, bottom: 4, left: 8 }}>
@@ -36,7 +36,15 @@ export function ResultChart({ content }: { content: string }) {
             cursor={{ fill: 'oklch(0.95 0.01 145)' }}
             formatter={(v) => compactUsd(Number(v))}
           />
-          <Bar dataKey="value" fill="url(#fr024BarGreen)" radius={[6, 6, 2, 2]} maxBarSize={64}>
+          <Bar
+            dataKey="value"
+            fill="url(#fr024BarGreen)"
+            radius={[6, 6, 2, 2]}
+            maxBarSize={64}
+            isAnimationActive
+            animationDuration={600}
+            animationEasing="ease-out"
+          >
             <LabelList
               dataKey="value"
               position="top"

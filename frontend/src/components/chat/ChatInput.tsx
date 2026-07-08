@@ -49,7 +49,7 @@ export function ChatInput({ onSend, onStop, isStreaming, disabled }: Props) {
             <button
               type="button"
               onClick={onStop}
-              className="flex h-10 items-center gap-1.5 rounded-xl bg-destructive px-3.5 text-sm font-semibold text-destructive-foreground"
+              className="flex h-10 items-center gap-1.5 rounded-xl bg-destructive px-3.5 text-sm font-semibold text-destructive-foreground transition active:scale-95"
             >
               <Square className="h-3 w-3" fill="currentColor" /> Stop
             </button>
@@ -58,7 +58,7 @@ export function ChatInput({ onSend, onStop, isStreaming, disabled }: Props) {
               type="submit"
               disabled={disabled || !text.trim()}
               aria-label="Send"
-              className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-green transition-opacity disabled:opacity-40 disabled:shadow-none"
+              className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-green transition hover:bg-primary/90 active:scale-90 disabled:opacity-40 disabled:shadow-none disabled:active:scale-100"
             >
               <ArrowUp className="h-4 w-4" />
             </button>

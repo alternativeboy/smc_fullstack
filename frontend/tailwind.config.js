@@ -36,7 +36,13 @@ export default {
         'green-lg': '0 4px 12px oklch(0.62 0.13 155 / 0.28)',
         frame: '0 1px 2px oklch(0.2 0 0 / 0.04), 0 24px 48px -12px oklch(0.2 0.02 250 / 0.16)',
       },
+      keyframes: {
+        caret: { '0%,49%': { opacity: '1' }, '50%,100%': { opacity: '0' } },
+      },
+      animation: {
+        caret: 'caret 1s steps(1) infinite',
+      },
     },
   },
-  plugins: [require('@tailwindcss/typography')],
+  plugins: [require('@tailwindcss/typography'), require('tailwindcss-animate')],
 };

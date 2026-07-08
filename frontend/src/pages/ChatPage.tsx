@@ -100,7 +100,7 @@ export function ChatPage() {
 
         <button
           onClick={newChat}
-          className="flex w-full items-center justify-center gap-1.5 rounded-xl bg-primary py-2.5 text-sm font-semibold text-primary-foreground shadow-green transition-colors hover:bg-primary/90"
+          className="flex w-full items-center justify-center gap-1.5 rounded-xl bg-primary py-2.5 text-sm font-semibold text-primary-foreground shadow-green transition hover:bg-primary/90 active:scale-[0.98]"
         >
           <Plus className="h-4 w-4" /> New chat
         </button>
@@ -130,7 +130,7 @@ export function ChatPage() {
         <main className="flex-1 overflow-y-auto px-8 py-7">
           <div className="mx-auto flex max-w-3xl flex-col gap-5">
             {messages.length === 0 && (
-              <div className="flex flex-col items-center gap-6 pt-24 text-center">
+              <div className="flex animate-in fade-in flex-col items-center gap-6 pt-24 text-center duration-500">
                 <span className="flex h-16 w-16 items-center justify-center rounded-[18px] bg-secondary">
                   <BarChart3 className="h-7 w-7 text-secondary-foreground" />
                 </span>
@@ -150,7 +150,7 @@ export function ChatPage() {
         </main>
 
         {limitError && (
-          <div className="border-t border-warning-border bg-warning px-8 py-3 text-center text-warning-foreground">
+          <div className="animate-in fade-in slide-in-from-bottom-2 border-t border-warning-border bg-warning px-8 py-3 text-center text-warning-foreground duration-300">
             <p className="text-sm font-semibold">{limitError.message}</p>
             <p className="text-xs opacity-80">Resets in ~{resetsIn(limitError.resetAt)}.</p>
             <button
