@@ -13,18 +13,20 @@ import {
 import type { Request, Response } from 'express';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { AuthUser, CurrentUser } from '../common/decorators/current-user.decorator';
+import { UsageLimitGuard } from '../usage/guards/usage-limit.guard';
 import { CreateMessageDto } from './dto/create-message.dto';
 import { MessagesService } from './messages.service';
 
+// JwtAuthGuard first (sets req.user), then the pre-flight usage check (FR-021).
 @Controller('conversations/:id/messages')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, UsageLimitGuard)
 export class MessagesController {
   constructor(private readonly messages: MessagesService) {}
 
   /**
    * FR-004/005 — send a message and stream the AI response as SSE over this POST
    * (fetch()+ReadableStream on the client). @Res() is used to write the stream and
-   * observe req 'close' for aborts. Ownership is checked BEFORE any SSE header, so
+   * observe res 'close' for aborts. Ownership is checked BEFORE any SSE header, so
    * a foreign id returns a normal 404 (FR-014).
    */
   @Post()
@@ -45,7 +47,10 @@ export class MessagesController {
 
     const abort = new AbortController();
     let finished = false;
-    req.on('close', () => {
+    // Use res 'close' — it fires reliably when the underlying socket is
+    // severed mid-stream, whereas req 'close' may only fire after the
+    // response is finalized (too late for an in-flight abort).
+    res.on('close', () => {
       if (!finished) abort.abort();
     });
 

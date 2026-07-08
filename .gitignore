@@ -27,6 +27,9 @@ frontend/dist/
 frontend/dist-ssr/
 *.local
 
+# Prompts
+prompts
+
 # NestJS (backend)
 backend/dist/
 

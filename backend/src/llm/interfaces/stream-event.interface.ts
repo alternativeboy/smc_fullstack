@@ -16,6 +16,7 @@ export interface StreamResult {
   cost: number;
   toolCalls: unknown[];
   toolResults: unknown[];
+  partial: boolean; // true when the client aborted mid-stream
 }
 
 export interface ConversationTurn {
