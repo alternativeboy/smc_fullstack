@@ -1,7 +1,7 @@
 # 📊 PROGRESS — Financial Data Chat Assistant
 
 > Single source of truth for project status. Read by both the human and the agent.
-> Last updated: 2026-07-08 · Updated by: human (Phase 5 sign-off)
+> Last updated: 2026-07-08 · Updated by: human + assistant (Phase 6 complete)
 
 ---
 
@@ -37,10 +37,10 @@
 | **4a — SQL guardrails** | `SqlValidatorService` + FinancialModule via `llm_reader` | ✅ | **4a.1 done (self-verified 2026-07-07, no DB):** `nest build` clean; `sql-validator.service.spec.ts` **41 tests green** (full suite 63/63). Blocks: all 14 keywords incl. mixed-case, stacked `;`, line/block comments, `pg_`/`pg_sleep`/`information_schema`, `users`/`conversations`/`messages`/`audit_logs` direct + via JOIN/UNION exfil, no-`financial_data` queries. Passes: CTE, aggregates, GROUP/ORDER BY, LIMIT, and blocked-words-in-string-literals (strengthening). **4a.2 done (human-verified 2026-07-07):** FinancialModule with a SECOND named `llm_reader` DataSource (statement_timeout 5s), FinancialData entity (read-only), FinancialService (Layer 2 validate → Layer 3 execute → 200-row cap + truncated). unit 66/66; `test:e2e` green — valid SELECT returns rows, cross-join capped at 200/truncated, **raw INSERT/UPDATE/DELETE via llm_reader → `permission denied` (Layer 3 independent of validator)**, `SELECT users` denied, `pg_sleep(10)` aborted by statement_timeout. | Sub-steps: **4a.1 ✅ · 4a.2 ✅** — Phase 4a human-reviewed & signed off ✅ 2026-07-07. |
 | **4b — LLM streaming** | OpenAI stream + tool loop, SSE protocol, save message/cost/audit | ✅ | **4b.1 done (self-verified 2026-07-08, no DB/API — $0):** LlmModule building blocks — system prompt + execute_sql tool VERBATIM from prompt_spec (asserted, incl. new missing-year rule), StreamEvent interface, PromptBuilder, OutputValidator (Layer 4, log-only), cost helper (§5 pricing), `llm.service.ts` tool-loop generator. `nest build` clean; full suite **70/70**; mocked-OpenAI tests cover full S1 exchange (tool_call→execute→tool_result→answer→usage, cost asserted) + validator-rejection fed back without crash. **4b.2 done (human-verified 2026-07-08, mocked OpenAI — $0):** `POST /conversations/:id/messages` (JWT-guarded, ownership→404), MessagesService orchestrates stream→SSE→persist. e2e (38 passing): ordered SSE tool_call/tool_result/token/usage/done, user+assistant messages persisted (cost≈$0.0048, tool_calls, is_partial=false), audit `query` row written, cross-user→404. Unit: abort→partial (is_partial=true) save, OpenAI failure→`event:error` no crash. maxRetries=2 (GAP-005). **4b.3 done (human-run live, 2026-07-08):** S1/S2 verified end-to-end on gpt-4o-mini AND gpt-4o. All grounded correctly (numbers match DB): S1 single Apple 2023 = $96,995,000,000; S1 table = 15 tech companies 2024 exact; S2 Toyota → "I don't have data"; S2 2020 → "only 2022-2025"; S2 EBITDA → lists 4 metrics; **missing-year Shopify 2022 → "I don't have data for Shopify in 2022"** (rule works). Source disclosed (CR-013). Cost/audit persisted. Budget logged §4. | Sub-steps: **4b.1 ✅ · 4b.2 ✅ · 4b.3 ✅** — Phase 4b human-reviewed & signed off ✅ 2026-07-08. |
 | **5 — Usage + interruption** | Redis usage + guard, partial-save on abort | ✅ | **5.1 done (human-verified 2026-07-08, $0):** UsageModule — `usage.service.ts` (atomic `INCRBYFLOAT` + EXPIRE-on-first, TTL reset, limit/interval from config), `UsageLimitGuard` (pre-flight → friendly 429 UsageLimitError + resetAt), `GET /usage/status`; charge on normal completion. unit 79/79 (TTL window integrity, atomic no-read-modify-write, getStatus math); `test:e2e` — **S4**: message charges usage → exhaust → 429 friendly body; concurrent 20× track() sums exactly (real Redis atomicity). **5.2 done (human-verified 2026-07-08, $0):** LlmService handles abort internally → returns partial with fair cost (chars/4 estimate; prompt dominates); MessagesService persists is_partial=true + charges Redis + audits. Fixes: `res.on('close')` (reliable disconnect vs req 'close') + defensive `write()` (dead-socket writes no longer abort persistence). unit 79/79; `test:e2e` **S3/S5** — raw http `req.destroy()` severs mid-stream → partial saved (content + cost>0), usage charged, audit is_partial row, history intact (user + 1 partial, ordered, no dup). | Sub-steps: **5.1 ✅ · 5.2 ✅** — Phase 5 human-reviewed & signed off ✅ 2026-07-08. |
-| **6 — Frontend** | Auth pages, chat + `useStreamChat`, ToolCallWidget, Markdown/charts, sidebar, usage badge | ⬜ | — | DoD: human clicks through every scenario in a browser |
+| **6 — Frontend** | Auth pages, chat + `useStreamChat`, ToolCallWidget, Markdown/charts, sidebar, usage badge | 🔍 | **6.1 code-complete (2026-07-08):** Vite + React 18 + TS + Tailwind + hand-rolled shadcn-style ui + Zustand + React Router. Auth: `auth.store` (token IN MEMORY, no persist), `api.ts` (Bearer; credentials:'include' only on refresh/logout; 401→silent-refresh-once→retry→else /login), `auth.service`, Login/Register pages, `useAuthBootstrap` (mount refresh + /me), ProtectedRoute. `npm run build` clean (tsc + vite, 62 modules). **Browser DoD ✅ (human, 2026-07-08):** register → reload stays logged in via silent refresh; access token NOT in local/session storage; logout→/login; bad login errors. Fixed a cross-origin cookie drop with a **Vite dev proxy** (same-origin). **6.2 code-complete (2026-07-08, builds ✅ / browser ⏳):** `chat.store` + `useStreamChat` (fetch+ReadableStream SSE parse, AbortController Stop, 401 silent-refresh + 429 branch), ChatPage (create/select, most-recent-on-load restores history), ChatMessage/ChatInput/StreamingIndicator, `is_partial` "interrupted" note (S5). `npm run build` clean (68 modules). **6.3 code-complete (2026-07-08, builds ✅ / browser ⏳):** ToolCallWidget (SQL visible open-by-default while running + row count, collapsible, rows expandable), MarkdownRenderer (react-markdown + remark-gfm, GFM tables, HTML escaped), ResultChart (Recharts bar chart from a parsed markdown table — numeric column heuristic, survives reload; renders nothing if no table). `npm run build` clean. **6.4 code-complete (2026-07-08, builds ✅ / browser ⏳):** ConversationList/Item sidebar (select, most-recent), delete via ConfirmDialog → removes + drops active to empty chat (S6/FR-019), UsageBadge + useUsage (poll /usage/status every 20s + after each message), 429 composer banner (friendly message + resets-in + disable send + Try again) for S4/FR-021. `npm run build` clean. | Sub-steps: **6.1 ✅ · 6.2 ✅ · 6.3 ✅ · 6.4 ✅** — **full S1–S6 browser walkthrough passed (human, 2026-07-08)**. Phase 6 complete, awaiting human ✅. |
 | **7 — Polish** | README, full S1–S6 e2e, Helmet, audit review | ⬜ | — | README = 10% of grade |
 
-**Overall:** `7 / 9` phases done (Phase 0/1/2/3 ✅; Phase 4a ✅; Phase 4b ✅; Phase 5 ✅)
+**Overall:** `7 / 9` phases done (Phase 0–5 ✅; **Phase 6 🔍** — S1–S6 browser-verified, awaiting sign-off). Only Phase 7 (Polish) remains.
 
 ---
 
@@ -52,8 +52,8 @@
 | S2 | Data not available → clearly stated, no fabrication | 4b | ✅ | Live gpt-4o: Toyota / 2020 / EBITDA / Shopify-2022 all declined correctly, no fabrication |
 | S3 | Stop mid-generation → partial saved, cost charged | 5 | ✅ | interruption.e2e: severed socket → partial is_partial=true, cost>0, usage charged |
 | S4 | Usage limit exceeded → friendly 429 | 5 | ✅ | usage.e2e: exhausted budget → POST message pre-flight → 429 UsageLimitError (error/message with $limit/resetAt) |
-| S5 | Browser refresh mid-stream → history intact, no dup/loss | 5, 6 | 🚧 | Backend ✅ (interruption.e2e: raw req.destroy() mid-stream → GET conversation = user + 1 partial, ordered, no dup). Remaining: browser reload UI (Phase 6). |
-| S6 | Delete conversation → confirmation, ownership, audit | 3, 6 | 🚧 | Backend ✅ (delete→200→audit row→404/hidden→messages retained; cross-user→404+no audit). Remaining: confirmation dialog (Phase 6). |
+| S5 | Browser refresh mid-stream → history intact, no dup/loss | 5, 6 | 🔍 | Backend (interruption.e2e) + **UI browser-verified (6.2)**: Stop mid-stream → partial with "interrupted" note → reload → partial + history intact, no dup. |
+| S6 | Delete conversation → confirmation, ownership, audit | 3, 6 | 🔍 | Backend ✅ + **UI browser-verified (6.4)**: sidebar delete → confirm dialog → removed, active→empty chat, audit row on backend. |
 
 ---
 
@@ -66,12 +66,12 @@
 
 | ID | Summary | Phase | Status |
 |----|---------|-------|--------|
-| FR-001 | Chat application | 3, 6 | 🚧 |
-| FR-002 | React + TypeScript frontend | 6 | ⬜ |
+| FR-001 | Chat application | 3, 6 | 🔍 |
+| FR-002 | React + TypeScript frontend | 6 | 🔍 |
 | FR-003 | NestJS backend | 1 | ✅ |
 | FR-004 | Token-by-token streaming | 4b | ✅ |
-| FR-005 | SQL tool call visible in UI | 4b, 6 | 🚧 |
-| FR-006 | Markdown render (tables, charts) | 6 | ⬜ |
+| FR-005 | SQL tool call visible in UI | 4b, 6 | 🔍 |
+| FR-006 | Markdown render (tables, charts) | 6 | 🔍 |
 | FR-007 | Grounding — DB only, no hallucination | 4a, 4b | ✅ |
 | FR-008 | Missing data stated clearly | 4b | ✅ |
 | FR-009 | Spending limit per user (default $1) | 5 | ✅ |
@@ -83,10 +83,10 @@
 | FR-015 | Stop mid-generation | 5 | ✅ |
 | FR-016 | Partial message saved | 5 | ✅ |
 | FR-017 | Partial cost deducted | 5 | ✅ |
-| FR-018 | Revisit past conversations | 3, 6 | 🚧 |
-| FR-019 | Delete with confirmation | 3, 6 | 🚧 |
-| FR-020 | Refresh → correct history | 5, 6 | 🚧 |
-| FR-021 | Friendly limit-exceeded message | 5, 6 | 🚧 |
+| FR-018 | Revisit past conversations | 3, 6 | 🔍 |
+| FR-019 | Delete with confirmation | 3, 6 | 🔍 |
+| FR-020 | Refresh → correct history | 5, 6 | 🔍 |
+| FR-021 | Friendly limit-exceeded message | 5, 6 | 🔍 |
 | FR-022 | PostgreSQL + financial_data.sql | 0, 1 | ✅ |
 
 ### Non-Functional (NFR)
@@ -183,6 +183,7 @@
 | 2026-07-08 | UsageService reads TTL **sequentially after** INCRBYFLOAT (not the prompt_spec §5 `Promise.all`) | A parallel TTL read can hit before the key exists → returns -2, so the EXPIRE-on-first never fires and the key would never reset. Sequential read reports -1 on a new key. | backend/src/usage/usage.service.ts |
 | 2026-07-08 | Disconnect detected via **`res.on('close')`**, not `req.on('close')` | `res` 'close' fires reliably/promptly on premature socket termination during a streaming response; `req` 'close' (POST body already read) is late/unreliable mid-response. Plus a defensive `write()` guard so dead-socket writes don't throw and abort the partial persistence. | backend/src/chat/messages.controller.ts, messages.service.ts |
 | 2026-07-08 | Partial cost on abort estimated via **~4 chars/token** | OpenAI's usage chunk only arrives at a round's end, so it's unavailable on a mid-stream abort — any method is an estimate. Prompt tokens (which were sent) dominate the fair charge. | backend/src/llm/llm.service.ts (abortResult) |
+| 2026-07-08 | Frontend uses a **Vite dev proxy** (`/api` → :3000) so all requests are same-origin | Cross-origin (5173→3000) drops the httpOnly Set-Cookie on login/register unless credentials:include everywhere; the proxy keeps the "credentials:include only on refresh/logout" rule intact, needs no CORS, and mirrors a prod reverse proxy. VITE_API_URL empty in dev. | frontend/vite.config.ts, frontend/src/services/api.ts |
 | 2026-07-07 | SqlValidator scans keyword/table/`;`/comment on a **string-literal-blanked** copy of the SQL | Strengthening over prompt_spec §3's raw-regex: prevents false positives when a blocked word appears as DATA (e.g. `company = 'Drop Inc'`). Does NOT weaken security — Layer 3 (llm_reader) is still the real guarantee. **Proposed prompt_spec §3 update** for human review. | backend/src/llm/services/sql-validator.service.ts |
 
 ---
@@ -193,6 +194,11 @@
 
 | Date | Who | Phase | What happened | Blockers / follow-ups |
 |------|-----|-------|---------------|----------------------|
+| 2026-07-08 | human + assistant | 6 | **Full S1–S6 browser walkthrough passed.** Frontend complete (Vite/React/TS/Tailwind + Zustand): auth (in-memory token, silent refresh via Vite proxy), streaming chat (fetch+ReadableStream, Stop→partial), ToolCallWidget + markdown tables + Recharts, sidebar + delete-confirm, usage badge, friendly 429. Phase 6 + UI rows → 🔍 (FR-001/002/005/006/018/019/020/021, S5/S6). | Phase 6 🔍 awaiting human ✅. Then Phase 7 (Polish): README, full S1–S6 e2e, Helmet, audit review, optional recharts lazy-load / conversation auto-titling. |
+| 2026-07-08 | assistant | 6.4 | Sidebar + management: ConversationList/Item (select, delete via hand-rolled ConfirmDialog → S6/FR-019, active-deleted drops to empty chat), UsageBadge + useUsage (poll /usage/status every 20s + after send), 429 composer banner (message + resets-in + disable + Try again → S4/FR-021), ChatPage relaid out with left sidebar. `npm run build` clean (2609 modules). | 6.4 code ✅, **FINAL browser walkthrough pending human** (S1–S6 end-to-end). After that: flip FR-018/019/021 + S6 + Phase 6 → 🔍. | 
+| 2026-07-08 | assistant | 6.3 | Tool widget + markdown/charts (grading-critical): ToolCallWidget (FR-005, SQL visible while running + row count + expandable rows), MarkdownRenderer (react-markdown + remark-gfm tables, raw HTML escaped), ResultChart (Recharts bar chart parsed from the markdown table — numeric-column heuristic, `$B/M` parsing, renders only from streamed data, survives reload). Installed react-markdown/remark-gfm/recharts/@tailwindcss/typography. `npm run build` clean (2602 modules; recharts bumps bundle — acceptable for dev). | 6.3 code ✅, **browser DoD pending human** (SQL widget + table + chart on the tech-2024 query). Next: 6.4. Optional: lazy-load recharts to trim bundle. |
+| 2026-07-08 | assistant | 6.2 | Chat core + streaming: `chat.store`, `chat.service`, `useStreamChat` (POST fetch + ReadableStream SSE parsing, dispatch token/tool_call/tool_result/usage/done/error, AbortController Stop, 401→silent-refresh→retry, 429→limitError), ChatPage (new/select conversation, opens most-recent on load so reload restores history), ChatMessage (+ is_partial "interrupted" note, tool-call stub for 6.3), ChatInput (Send/Stop, Enter-to-send), StreamingIndicator. `npm run build` clean (68 modules). | 6.2 code ✅, **browser DoD pending human** (stream live, Stop→partial, reload→partial persists). Next after browser check: 6.3. |
+| 2026-07-08 | assistant | 6.1 | Scaffolded `frontend/` (Vite + React 18 + TS + Tailwind + shadcn-style ui + Zustand + React Router) + full auth: in-memory token store, api client with silent-refresh-on-401, Login/Register, mount bootstrap refresh + /me, ProtectedRoute. Used hand-rolled shadcn-style components (no shadcn CLI — needs interactive init) and plain forms (no react-hook-form) to keep deps lean. `npm run build` clean. | 6.1 code ✅, **browser DoD pending human** (sandbox has no browser/Docker). Needs backend running + CORS_ORIGIN=http://localhost:5173 + COOKIE_SECURE=false. Next after browser check: 6.2. |
 | 2026-07-08 | human | 5 | Reviewed & signed off Phase 5 → row + requirement rows to ✅ (FR-009/010/011/015/016/017, NFR-005/007, CR-015, S3, S4). Kept 🚧 (Phase-6 UI): FR-020, FR-021, S5. Overall **7/9**. | Only Phase 6 (Frontend) + Phase 7 (Polish) remain. Backend feature-complete. |
 | 2026-07-08 | human + assistant | 5.2 | Interruption: LlmService handles abort internally (returns partial + fair chars/4 cost), MessagesService persists is_partial + charges + audits. Debugged the S5 e2e: partial wasn't saving because (a) `req.on('close')` fired late — human switched to `res.on('close')`; (b) dead-socket `res.write()` threw → aborted persistence — added defensive `write()` guard. Real socket-sever test (raw http `req.destroy()`) now green. unit 79/79, human ran `test:e2e` → S3/S5 pass. $0 spent. **Phase 5 complete → 🔍 overall.** On `feat/Phase5_*`. | 5.2 ✅ (S3/S5, FR-015/016/017, NFR-007 🔍; FR-020 🚧 UI Phase 6). Awaiting human review Phase 5 → ✅. Next: Phase 6 (Frontend). |
 | 2026-07-08 | human + assistant | 5.1 | Usage tracking + limit guard: `usage/` module (UsageService atomic INCRBYFLOAT+TTL, UsageLimitGuard pre-flight 429, GET /usage/status), charge on completion wired into MessagesService. Guard order JwtAuthGuard→UsageLimitGuard on the message endpoint. Fixed a flaky S4 e2e (process.env override of USAGE_LIMIT leaked across e2e files — rewrote S4 to exhaust via `track()`, no env mutation; this also fixed a messages.e2e 403). Verified: build clean, unit 79/79, human ran `test:e2e` → S4 429 + concurrency atomic. $0 spent. On `feat/Phase5_*`. | 5.1 ✅ (FR-009/010/011/021, NFR-005, CR-015 🔍; S4 🔍). Next: 5.2 (partial charge on abort + real socket-kill S3/S5). Commit 5.1. |
