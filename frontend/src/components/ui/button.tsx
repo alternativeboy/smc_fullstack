@@ -2,7 +2,7 @@ import * as React from 'react';
 import { cn } from '@/lib/utils';
 
 const variants = {
-  default: 'bg-primary text-primary-foreground shadow-green hover:bg-primary/90',
+  default: 'bg-emerald text-primary-foreground shadow-green hover:brightness-105',
   outline: 'border border-input bg-background hover:bg-muted',
   ghost: 'hover:bg-muted',
   destructive: 'bg-destructive text-destructive-foreground hover:bg-destructive/90',

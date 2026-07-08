@@ -19,7 +19,7 @@ export function UsageBadge() {
 
   return (
     <div className="flex items-center gap-2.5 rounded-xl px-2 py-2">
-      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[oklch(0.75_0.09_155)] text-[13px] font-bold text-primary-foreground">
+      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald text-[13px] font-bold text-primary-foreground">
         {initials}
       </span>
       <div className="min-w-0 flex-1">

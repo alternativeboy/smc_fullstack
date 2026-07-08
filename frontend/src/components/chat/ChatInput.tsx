@@ -58,7 +58,7 @@ export function ChatInput({ onSend, onStop, isStreaming, disabled }: Props) {
               type="submit"
               disabled={disabled || !text.trim()}
               aria-label="Send"
-              className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-green transition hover:bg-primary/90 active:scale-90 disabled:opacity-40 disabled:shadow-none disabled:active:scale-100"
+              className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald text-primary-foreground shadow-green transition hover:brightness-105 active:scale-90 disabled:opacity-40 disabled:shadow-none disabled:active:scale-100"
             >
               <ArrowUp className="h-4 w-4" />
             </button>

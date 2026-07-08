@@ -92,15 +92,15 @@ export function ChatPage() {
       {/* Sidebar */}
       <aside className="flex w-[280px] flex-col border-r border-sidebar-border bg-sidebar px-4 py-5">
         <div className="mb-5 flex items-center gap-2.5 px-2">
-          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary shadow-green">
+          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald shadow-green">
             <span className="h-2.5 w-2.5 rounded-[3px] bg-primary-foreground" />
           </span>
-          <span className="text-[15px] font-bold">Finch</span>
+          <span className="text-[15px] font-extrabold tracking-tight">Finch</span>
         </div>
 
         <button
           onClick={newChat}
-          className="flex w-full items-center justify-center gap-1.5 rounded-xl bg-primary py-2.5 text-sm font-semibold text-primary-foreground shadow-green transition hover:bg-primary/90 active:scale-[0.98]"
+          className="flex w-full items-center justify-center gap-1.5 rounded-xl bg-emerald py-2.5 text-sm font-semibold text-primary-foreground shadow-green transition hover:brightness-105 active:scale-[0.98]"
         >
           <Plus className="h-4 w-4" /> New chat
         </button>
@@ -123,20 +123,26 @@ export function ChatPage() {
 
       {/* Main */}
       <div className="flex flex-1 flex-col">
-        <header className="flex h-16 flex-shrink-0 items-center justify-between border-b px-7">
-          <h1 className="truncate text-base font-bold">{activeTitle}</h1>
+        <header className="flex h-16 flex-shrink-0 items-center justify-between border-b px-8">
+          <h1 className="truncate text-lg font-extrabold tracking-tight">{activeTitle}</h1>
         </header>
 
-        <main className="flex-1 overflow-y-auto px-8 py-7">
-          <div className="mx-auto flex max-w-3xl flex-col gap-5">
+        <main className="flex-1 overflow-y-auto px-10 py-9">
+          <div className="mx-auto flex max-w-3xl flex-col gap-6">
             {messages.length === 0 && (
-              <div className="flex animate-in fade-in flex-col items-center gap-6 pt-24 text-center duration-500">
-                <span className="flex h-16 w-16 items-center justify-center rounded-[18px] bg-secondary">
-                  <BarChart3 className="h-7 w-7 text-secondary-foreground" />
+              <div className="relative flex animate-in fade-in flex-col items-center gap-7 pt-28 text-center duration-500">
+                <div
+                  aria-hidden
+                  className="pointer-events-none absolute left-1/2 top-20 h-64 w-64 -translate-x-1/2 rounded-full bg-emerald-soft blur-2xl"
+                />
+                <span className="relative flex h-16 w-16 items-center justify-center rounded-[20px] bg-emerald shadow-green">
+                  <BarChart3 className="h-7 w-7 text-primary-foreground" />
                 </span>
-                <div className="space-y-2">
-                  <h2 className="text-2xl font-extrabold">Ask anything about your financial data</h2>
-                  <p className="text-[15px] text-muted-foreground">
+                <div className="relative space-y-3">
+                  <h2 className="bg-gradient-to-br from-[oklch(0.32_0.05_155)] to-primary bg-clip-text text-4xl font-extrabold tracking-tight text-transparent">
+                    Ask anything about your financial data
+                  </h2>
+                  <p className="text-base text-muted-foreground">
                     Income-statement data for 49 U.S. public companies, 2022–2025.
                   </p>
                 </div>
