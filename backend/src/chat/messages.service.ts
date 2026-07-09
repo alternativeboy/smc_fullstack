@@ -45,6 +45,19 @@ export class MessagesService {
     const history = await this.buildHistory(conversationId); // prior turns (excludes the new msg)
     await this.saveUser(conversationId, userContent);
 
+    // FR-025: Auto-generate title from the first message
+    if (history.length === 0) {
+      let title = userContent.split('\n')[0].trim();
+      if (title.length > 50) {
+        title = title.substring(0, 47) + '...';
+      }
+      if (title) {
+        // Await in the background or foreground? Let's await to be safe, but non-blocking is fine too.
+        // Doing it sequentially here is fine, it's fast.
+        await this.chat.rename(userId, conversationId, title);
+      }
+    }
+
     let content = '';
     const toolCalls: unknown[] = [];
     const toolResults: Array<{ query: string; rowCount: number }> = [];
