@@ -626,18 +626,17 @@ sequenceDiagram
     U->>F: Click "Delete" on a conversation
     F->>U: Confirm dialog ("Delete this conversation?")
     U->>F: Confirm
-    F->>B: DELETE /api/conversations/:id  (Authorization: Bearer <jwt>)
+    F->>B: DELETE /api/conversations/:id (Authorization: Bearer jwt)
     B->>B: Verify conversation.user_id === auth.userId
     alt Owner match
         B->>D: DELETE FROM conversations WHERE id = :id AND user_id = :userId
-        Note over D: messages cascade-deleted (ON DELETE CASCADE)
-        B->>D: INSERT audit_logs (action:'delete', resource:'conversation', metadata:{conversationId})
+        B->>D: INSERT audit_logs (action delete, resource conversation)
         B-->>F: 204 No Content
-        F->>F: Remove conversation from sidebar; if active, redirect to new/empty chat
+        F->>F: Remove from sidebar; redirect to empty chat if it was active
         F-->>U: Conversation gone
-    else Not owner / not found
+    else Not owner or not found
         B-->>F: 404 Not Found
-        F-->>U: "Conversation not found."
+        F-->>U: Conversation not found
     end
 ```
 
