@@ -19,13 +19,25 @@ Schema:
   - company (VARCHAR) — Company name (e.g., "Apple", "Google", "JPMorgan")
   - ticker (VARCHAR) — Stock ticker symbol (e.g., "AAPL", "GOOGL", "JPM")
   - sector (VARCHAR) — One of: Technology, Finance, Healthcare, Consumer, Energy
-  - year (INTEGER) — Fiscal year: {{YEAR_LIST}}
+  - year (INTEGER) — Fiscal year: 2022, 2023, 2024, or 2025
   - revenue (BIGINT) — Total revenue in USD (may be NULL for some companies)
   - net_income (BIGINT) — Net income in USD (may be NULL)
   - operating_income (BIGINT) — Operating income in USD (may be NULL)
   - gross_profit (BIGINT) — Gross profit in USD (may be NULL)
 
-{{COVERAGE_BLOCK}}
+Coverage: 49 U.S. public companies across 5 sectors, fiscal years 2022-2025 only.
+Total rows: 192.
+
+## Companies Available
+Technology: AMD, Adobe, Amazon, Apple, Google, Intel, Meta, Microsoft, Netflix,
+  Nvidia, Oracle, Salesforce, Shopify, Tesla, Uber
+Finance: AmericanExpress, BankOfAmerica, BlackRock, CapitalOne, Citigroup, Goldman,
+  JPMorgan, Mastercard, Morgan Stanley, PayPal, PNC, Schwab, USB, Visa, WellsFargo
+Healthcare: AbbVie, Amgen, Bristol-Myers, Eli Lilly, JohnsonJohnson, Merck, Pfizer,
+  UnitedHealth
+Consumer: Coca-Cola, Costco, HomeDepot, McDonald's, Nike, PepsiCo, Starbucks,
+  Target, Walmart
+Energy: Chevron, ExxonMobil
 
 ## CRITICAL RULES
 
@@ -35,11 +47,11 @@ Schema:
 
 2. **NO HALLUCINATION.** If the data needed to answer is not in the database:
    - If the company is not in the list above → say "I don't have data for [company]."
-   - If the year is outside {{YEAR_RANGE}} → say "My data only covers {{YEAR_RANGE}}."
+   - If the year is outside 2022-2025 → say "My data only covers 2022-2025."
    - If the metric is not available (e.g., EBITDA, EPS) → say "I only have revenue,
      net income, operating income, and gross profit."
    - If the company IS in the list but the query returns no row for a specific
-     year (some companies are covered for only part of the year range)
+     year (e.g., BlackRock has no 2024-2025 data; Shopify has no 2022-2023 data)
      → say "I don't have data for [company] in [year]." Do NOT imply the company
      is absent, and NEVER fabricate the figure.
    - NEVER invent or estimate numbers.
@@ -59,25 +71,8 @@ Schema:
    - Always include the unit (USD) and time period
 
 6. **Cite your source.** After answering, briefly mention: "Based on the financial_data
-   table covering {{YEAR_RANGE}} data."
+   table covering 2022-2025 data."
 ```
-
-> **Boot-filled placeholders (FR-023).** `{{COVERAGE_BLOCK}}`, `{{YEAR_LIST}}` and `{{YEAR_RANGE}}`
-> are **not** static — `PromptBuilderService` fills them at application startup from the live
-> `financial_data` table:
-> - `{{COVERAGE_BLOCK}}` → the "Coverage: N companies across M sectors, fiscal years YYYY–YYYY,
->   T rows" line plus the sector→companies listing.
-> - `{{YEAR_LIST}}` → the schema line's enumerated years (e.g. "2022, 2023, 2024, or 2025").
-> - `{{YEAR_RANGE}}` → the "outside" / citation year span (e.g. "2022-2025") in Rules 2 & 6.
->
-> So coverage **and** the year range track the DB after a data reload + backend restart. A startup
-> **schema guard** refuses to boot if `financial_data`'s columns drift from the schema above. These
-> coverage/schema queries are trusted, fixed, app-authored SQL — they run on the normal app DB
-> connection, **not** through `SqlValidatorService`/`llm_reader` (that sandbox exists only for
-> untrusted LLM-generated SQL). See PROGRESS Decision Log.
->
-> Rule 2's "no row for a year" guidance is phrased **generically** (no dataset-specific company/year
-> examples), so it stays correct when the data changes — there is nothing left to go stale.
 
 ---
 
@@ -571,30 +566,30 @@ EBITDA is not available. However, I can show you Apple's operating income or net
 
 ```mermaid
 sequenceDiagram
-    participant U as User (Browser)
+    participant U as User
     participant F as React Frontend
     participant B as NestJS Backend
     participant O as OpenAI
     participant R as Redis
     participant D as PostgreSQL
 
-    Note over B,O: Assistant is streaming "...net income in 2023 was $96.99"
+    Note over B,O: Assistant is streaming ...net income in 2023 was $96.99
     U->>F: Press F5 (refresh)
     F->>B: fetch stream aborted (req.on('close') fires)
     B->>B: abortController.abort()
     B->>O: Cancel stream (AbortError)
     B->>B: Save partial assistant message (is_partial = true) — FR-016
     B->>B: Calculate partial cost from tokens generated so far — FR-017
-    B->>R: INCRBYFLOAT usage:{userId} <partialCost>
+    B->>R: INCRBYFLOAT usage:(userId) partialCost
     B->>D: Save partial message + write to audit_logs
 
     Note over U,F: Page reloads
     U->>F: App re-mounts (silent token refresh via httpOnly cookie)
     F->>B: GET /api/conversations/:id
     B->>D: Fetch messages (incl. partial)
-    D-->>B: [..., {role:'assistant', content:'...$96.99', is_partial:true}]
+    D-->>B: messages incl. partial assistant message
     B-->>F: 200 conversation history
-    F-->>U: Render full history; partial message shown with a "response interrupted" indicator
+    F-->>U: Render full history with response interrupted indicator
 ```
 
 **Reloaded message payload (`GET /api/conversations/:id`):**
@@ -619,7 +614,7 @@ sequenceDiagram
 
 ### S6: Delete a Conversation (data management, CR-012 audit)
 
-**Scenario:** The user deletes a conversation from the sidebar. The backend verifies ownership, removes the conversation and its messages (cascade), records the deletion in the audit log, and the frontend removes it from the list. Deletion is scoped to the authenticated user — a user can never delete another user's conversation.
+**Scenario:** The user deletes a conversation from the sidebar. The backend verifies ownership, **soft-deletes** the conversation (`deleted_at`; its messages are retained, not cascade-removed), records the deletion in the audit log, and the frontend removes it from the list. Deletion is scoped to the authenticated user — a user can never delete another user's conversation.
 
 ```mermaid
 sequenceDiagram
@@ -631,18 +626,17 @@ sequenceDiagram
     U->>F: Click "Delete" on a conversation
     F->>U: Confirm dialog ("Delete this conversation?")
     U->>F: Confirm
-    F->>B: DELETE /api/conversations/:id  (Authorization: Bearer <jwt>)
+    F->>B: DELETE /api/conversations/:id (Authorization: Bearer jwt)
     B->>B: Verify conversation.user_id === auth.userId
     alt Owner match
-        B->>D: DELETE FROM conversations WHERE id = :id AND user_id = :userId
-        Note over D: messages cascade-deleted (ON DELETE CASCADE)
-        B->>D: INSERT audit_logs (action:'delete', resource:'conversation', metadata:{conversationId})
-        B-->>F: 204 No Content
-        F->>F: Remove conversation from sidebar; if active, redirect to new/empty chat
+        B->>D: UPDATE conversations SET deleted_at = now() WHERE id = :id AND user_id = :userId
+        B->>D: INSERT audit_logs (action delete_conversation, resource conversation)
+        B-->>F: 200 OK { message }
+        F->>F: Remove from sidebar, drop to empty chat if active
         F-->>U: Conversation gone
-    else Not owner / not found
+    else Not owner or not found
         B-->>F: 404 Not Found
-        F-->>U: "Conversation not found."
+        F-->>U: Conversation not found
     end
 ```
 
@@ -652,15 +646,15 @@ DELETE /api/conversations/6f1c2e10-... HTTP/1.1
 Authorization: Bearer <jwt>
 ```
 
-**Success response:** `204 No Content`
+**Success response:** `200 OK` — `{ "message": "Conversation deleted" }`
 
 **Audit log entry:**
 ```json
 {
-  "action": "delete",
+  "action": "delete_conversation",
   "resource": "conversation",
   "metadata": { "conversationId": "6f1c2e10-...", "messageCount": 8 }
 }
 ```
 
-> **Key guarantees:** ownership enforced server-side (a foreign `id` returns 404, never deletes), messages removed via `ON DELETE CASCADE` (no orphaned rows), and the deletion itself is recorded in `audit_logs` for traceability.
+> **Key guarantees:** ownership enforced server-side (a foreign `id` returns 404, never deletes), the conversation is **soft-deleted** (`deleted_at`) with its messages **retained** (no cascade), and the deletion itself is recorded in `audit_logs` for traceability.

@@ -123,9 +123,9 @@ sequenceDiagram
     B->>B: Hash password (bcrypt, cost 12)
     B->>DB: INSERT INTO users
     B->>B: Generate access JWT + refresh token (jti)
-    B->>R: SET refresh:{userId}:{jti} = sha256(refresh) EX ttl
-    B-->>F: 201 { accessToken, expiresIn, user }<br/>Set-Cookie: refreshToken=... HttpOnly; Secure; SameSite=Strict
-    F->>F: Keep accessToken in memory (Zustand); cookie handled by browser
+    B->>R: SET refresh:(userId):(jti) = sha256(refresh) EX ttl
+    B-->>F: 201 { accessToken, expiresIn, user } + Set-Cookie (httpOnly, Secure, SameSite=Strict)
+    F->>F: Keep accessToken in memory (Zustand), cookie handled by browser
 
     Note over U,R: Login (FR-013)
     U->>F: Enter email + password
@@ -133,31 +133,31 @@ sequenceDiagram
     B->>DB: SELECT user WHERE email = ?
     B->>B: bcrypt.compare(password, hash)
     B->>B: Generate access JWT + refresh token (jti)
-    B->>R: SET refresh:{userId}:{jti} = sha256(refresh) EX ttl
-    B-->>F: 200 { accessToken, expiresIn, user }<br/>Set-Cookie: refreshToken=... (httpOnly)
+    B->>R: SET refresh:(userId):(jti) = sha256(refresh) EX ttl
+    B-->>F: 200 { accessToken, expiresIn, user } + Set-Cookie (httpOnly)
 
     Note over U,R: Authenticated Request
-    F->>B: GET /api/conversations (Authorization: Bearer <access>)
+    F->>B: GET /api/conversations (Authorization: Bearer token)
     B->>B: JwtStrategy.validate(access token)
     B->>DB: SELECT conversations WHERE user_id = ?
     Note over B: FR-014: User isolation via user_id scope
     B-->>F: [conversations]
 
     Note over U,R: Token Refresh (rotation) — on app mount or 401
-    F->>B: POST /api/auth/refresh<br/>(no body; browser sends httpOnly cookie)
-    B->>R: GET refresh:{userId}:{jti} — verify hash matches
+    F->>B: POST /api/auth/refresh (no body, browser sends httpOnly cookie)
+    B->>R: GET refresh:(userId):(jti) — verify hash matches
     alt Valid & not yet used
-        B->>R: DEL old jti; SET new refresh:{userId}:{newJti}
-        B-->>F: 200 { accessToken, expiresIn }<br/>Set-Cookie: refreshToken=<rotated> (httpOnly)
-    else Missing/mismatch (reuse or expiry)
-        B->>R: SCAN refresh:{userId}:* + DEL (revoke session family)
-        B-->>F: 401 → client must log in again
+        B->>R: DEL old jti, SET new refresh:(userId):(newJti)
+        B-->>F: 200 { accessToken, expiresIn } + Set-Cookie rotated (httpOnly)
+    else Missing / mismatch (reuse or expiry)
+        B->>R: SCAN refresh:(userId):* + DEL (revoke session family)
+        B-->>F: 401 — client must log in again
     end
 
     Note over U,R: Logout
     F->>B: POST /api/auth/logout (Bearer + cookie)
-    B->>R: DEL refresh:{userId}:{jti}
-    B-->>F: 200; Set-Cookie: refreshToken=; Max-Age=0 (clear cookie)
+    B->>R: DEL refresh:(userId):(jti)
+    B-->>F: 200 + Set-Cookie cleared, Max-Age=0
 ```
 
 ---
