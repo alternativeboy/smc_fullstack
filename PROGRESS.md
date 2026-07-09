@@ -93,7 +93,7 @@
 | FR-023 | Dynamic system-prompt coverage + schema guard (post-v1, local scope) | 8 | ✅ |
 | FR-024 | UI/UX redesign per approved mockup (post-v1; refines NFR-002) | 9 | ✅ |
 | FR-025 | Auto-title conversation from first user message (post-v1) | 9 | ✅ |
-| FR-026 | Copy-to-clipboard for SQL + assistant responses (post-v1) | 9 | 🔍 |
+| FR-026 | Copy-to-clipboard for SQL + assistant responses (post-v1) | 9 | ✅ |
 
 ### Non-Functional (NFR)
 
