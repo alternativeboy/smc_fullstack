@@ -9,6 +9,7 @@ export default {
       fontFamily: {
         sans: ['"Plus Jakarta Sans"', 'ui-sans-serif', 'system-ui', 'sans-serif'],
         mono: ['"IBM Plex Mono"', 'ui-monospace', 'SFMono-Regular', 'monospace'],
+        inter: ['Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'],
       },
       colors: {
         border: c('--border'),
@@ -54,12 +55,24 @@ export default {
           '50%': { boxShadow: '0 6px 22px oklch(0.65 0.19 155 / 0.65)' },
         },
         gradientShift: { '0%,100%': { backgroundPosition: '0% 50%' }, '50%': { backgroundPosition: '100% 50%' } },
+        orbFloat: {
+          '0%,100%': { transform: 'translate(0,0) scale(1)' },
+          '25%': { transform: 'translate(30px,-40px) scale(1.1)' },
+          '50%': { transform: 'translate(-20px,20px) scale(0.95)' },
+          '75%': { transform: 'translate(15px,30px) scale(1.05)' },
+        },
+        particleFade: {
+          '0%,100%': { opacity: '0', transform: 'translateY(0)' },
+          '50%': { opacity: '0.4', transform: 'translateY(-20px)' },
+        },
       },
       animation: {
         caret: 'caret 1s steps(1) infinite',
         shimmer: 'shimmer 1.6s linear infinite',
         glow: 'glowPulse 3.5s ease-in-out infinite',
         'gradient-shift': 'gradientShift 6s ease infinite',
+        'orb-float': 'orbFloat 20s ease-in-out infinite',
+        particle: 'particleFade 4s ease-in-out infinite',
       },
     },
   },
