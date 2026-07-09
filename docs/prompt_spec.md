@@ -614,7 +614,7 @@ sequenceDiagram
 
 ### S6: Delete a Conversation (data management, CR-012 audit)
 
-**Scenario:** The user deletes a conversation from the sidebar. The backend verifies ownership, removes the conversation and its messages (cascade), records the deletion in the audit log, and the frontend removes it from the list. Deletion is scoped to the authenticated user — a user can never delete another user's conversation.
+**Scenario:** The user deletes a conversation from the sidebar. The backend verifies ownership, **soft-deletes** the conversation (`deleted_at`; its messages are retained, not cascade-removed), records the deletion in the audit log, and the frontend removes it from the list. Deletion is scoped to the authenticated user — a user can never delete another user's conversation.
 
 ```mermaid
 sequenceDiagram
@@ -629,10 +629,10 @@ sequenceDiagram
     F->>B: DELETE /api/conversations/:id (Authorization: Bearer jwt)
     B->>B: Verify conversation.user_id === auth.userId
     alt Owner match
-        B->>D: DELETE FROM conversations WHERE id = :id AND user_id = :userId
-        B->>D: INSERT audit_logs (action delete, resource conversation)
-        B-->>F: 204 No Content
-        F->>F: Remove from sidebar; redirect to empty chat if it was active
+        B->>D: UPDATE conversations SET deleted_at = now() WHERE id = :id AND user_id = :userId
+        B->>D: INSERT audit_logs (action delete_conversation, resource conversation)
+        B-->>F: 200 OK { message }
+        F->>F: Remove from sidebar, drop to empty chat if active
         F-->>U: Conversation gone
     else Not owner or not found
         B-->>F: 404 Not Found
@@ -646,15 +646,15 @@ DELETE /api/conversations/6f1c2e10-... HTTP/1.1
 Authorization: Bearer <jwt>
 ```
 
-**Success response:** `204 No Content`
+**Success response:** `200 OK` — `{ "message": "Conversation deleted" }`
 
 **Audit log entry:**
 ```json
 {
-  "action": "delete",
+  "action": "delete_conversation",
   "resource": "conversation",
   "metadata": { "conversationId": "6f1c2e10-...", "messageCount": 8 }
 }
 ```
 
-> **Key guarantees:** ownership enforced server-side (a foreign `id` returns 404, never deletes), messages removed via `ON DELETE CASCADE` (no orphaned rows), and the deletion itself is recorded in `audit_logs` for traceability.
+> **Key guarantees:** ownership enforced server-side (a foreign `id` returns 404, never deletes), the conversation is **soft-deleted** (`deleted_at`) with its messages **retained** (no cascade), and the deletion itself is recorded in `audit_logs` for traceability.
