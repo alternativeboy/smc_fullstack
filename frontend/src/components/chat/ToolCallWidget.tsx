@@ -1,5 +1,6 @@
 import { ChevronDown, Database } from 'lucide-react';
 import { useState } from 'react';
+import { CopyButton } from '@/components/ui/copy-button';
 import { cn } from '@/lib/utils';
 import type { ToolCall, ToolResult } from '@/types/chat.types';
 
@@ -43,9 +44,17 @@ export function ToolCallWidget({ toolCall, toolResult, running }: Props) {
 
       {open && (
         <div className="animate-in fade-in slide-in-from-top-1 border-t duration-200">
-          <pre className="overflow-x-auto whitespace-pre-wrap bg-sql-dark px-[19px] py-4 font-mono text-[13px] leading-relaxed text-[oklch(0.82_0.05_155)]">
-            {toolCall.arguments}
-          </pre>
+          <div className="group/sql relative">
+            <pre className="overflow-x-auto whitespace-pre-wrap bg-sql-dark px-[19px] py-4 pr-12 font-mono text-[13px] leading-relaxed text-[oklch(0.82_0.05_155)]">
+              {toolCall.arguments}
+            </pre>
+            {/* FR-026 — copy the generated SQL */}
+            <CopyButton
+              text={toolCall.arguments}
+              label="Copy SQL"
+              className="absolute right-2.5 top-2.5 text-[oklch(0.7_0.03_155)] opacity-0 transition-opacity hover:bg-white/10 hover:text-white focus-visible:opacity-100 group-hover/sql:opacity-100"
+            />
+          </div>
           {toolResult?.rows && toolResult.rows.length > 0 && (
             <details className="border-t px-4 py-2">
               <summary className="cursor-pointer font-mono text-[11px] uppercase tracking-wide text-muted-foreground">
