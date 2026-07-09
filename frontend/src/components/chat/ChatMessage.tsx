@@ -29,7 +29,11 @@ export function ChatMessage({ message }: { message: ChatMessageType }) {
 
       {message.content && (
         <>
-          <ResultChart content={message.content} />
+          {/* Chart only once the answer is complete: parsing/animating per token
+              restarts the bar animation on every re-render (jank), and the table
+              may still be mid-stream. Mounting it on completion plays the grow-in
+              animation exactly once. */}
+          {!message.streaming && <ResultChart content={message.content} />}
           <div className="text-[14.5px] leading-relaxed text-foreground">
             <MarkdownRenderer content={message.content} caret={message.streaming} />
           </div>
