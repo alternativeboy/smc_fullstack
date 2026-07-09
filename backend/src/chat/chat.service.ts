@@ -88,6 +88,12 @@ export class ChatService {
     return this.findOwned(userId, id);
   }
 
+  async rename(userId: string, id: string, title: string): Promise<void> {
+    const conversation = await this.findOwned(userId, id);
+    conversation.title = title;
+    await this.conversations.save(conversation);
+  }
+
   /**
    * The single choke point for FR-014: scope by user_id AND id. A foreign or
    * non-existent (or soft-deleted) id yields null → 404 — never another user's data.

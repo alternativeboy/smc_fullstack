@@ -28,8 +28,21 @@ export function useStreamChat() {
 
   const send = useCallback(async (conversationId: string, content: string) => {
     const store = useChatStore.getState();
+    const isFirstMessage = store.messages.length === 0;
+    
     store.setLimitError(null);
     store.pushMessage({ id: `u-${Date.now()}`, role: 'user', content });
+
+    // FR-025: Optimistically update title from first message
+    if (isFirstMessage) {
+      let title = content.split('\n')[0].trim();
+      if (title.length > 50) title = title.substring(0, 47) + '...';
+      if (title) {
+        store.setConversations(
+          store.conversations.map((c) => (c.id === conversationId ? { ...c, title } : c))
+        );
+      }
+    }
     const tempId = `a-${Date.now()}`;
     store.pushMessage({ id: tempId, role: 'assistant', content: '', streaming: true });
 

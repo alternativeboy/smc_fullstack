@@ -61,6 +61,7 @@
 | FR-022 | PostgreSQL database loaded with financial_data.sql (49 companies, 2022-2025) | Critical | §4, §6 | `[ ]` |
 | FR-023 | System prompt coverage (company list, sectors, year range) reflects the current `financial_data` contents at application startup; a schema guard fails loudly on column drift | High | derived (post-v1) | `[ ]` |
 | FR-024 | UI/UX redesign of the frontend to the approved mockup (`frontend/design/`), preserving all functional components and grading-critical widgets (streaming, Stop, tool-call/SQL, tables/charts, sidebar, delete-confirm, usage badge) | Medium | derived (post-v1) | `[ ]` |
+| FR-025 | Auto-generate a conversation title from the first user message (replacing the default "New Chat"), set server-side when the first message is sent; unchanged on later messages | Low | derived (post-v1) | `[ ]` |
 
 ---
 

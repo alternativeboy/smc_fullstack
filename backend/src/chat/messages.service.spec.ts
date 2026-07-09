@@ -35,7 +35,7 @@ function makeService(llm: any) {
     save: jest.fn(async (x) => ({ ...x, id: 'msg-1' })),
     find: jest.fn(async () => []),
   };
-  const chat = { assertOwned: jest.fn() };
+  const chat = { assertOwned: jest.fn(), rename: jest.fn() };
   const audit = { log: jest.fn() };
   const usage = { track: jest.fn() };
   const config = { getOrThrow: jest.fn(() => 'gpt-4o-mini') } as unknown as ConfigService;
