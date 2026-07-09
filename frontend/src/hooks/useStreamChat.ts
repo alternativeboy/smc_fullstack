@@ -28,18 +28,21 @@ export function useStreamChat() {
 
   const send = useCallback(async (conversationId: string, content: string) => {
     const store = useChatStore.getState();
-    const isFirstMessage = store.messages.length === 0;
-    
     store.setLimitError(null);
-    store.pushMessage({ id: `u-${Date.now()}`, role: 'user', content });
+    const userTempId = `u-${Date.now()}`;
+    store.pushMessage({ id: userTempId, role: 'user', content });
 
-    // FR-025: Optimistically update title from first message
-    if (isFirstMessage) {
+    // FR-025: optimistically retitle only a conversation still on the server default
+    // ("New Chat") — mirrors the backend's first-message guard without racing the
+    // async history load (messages.length can be 0 before an open conversation's
+    // GET resolves).
+    const conv = store.conversations.find((c) => c.id === conversationId);
+    if (conv?.title === 'New Chat') {
       let title = content.split('\n')[0].trim();
       if (title.length > 50) title = title.substring(0, 47) + '...';
       if (title) {
         store.setConversations(
-          store.conversations.map((c) => (c.id === conversationId ? { ...c, title } : c))
+          store.conversations.map((c) => (c.id === conversationId ? { ...c, title } : c)),
         );
       }
     }
@@ -76,7 +79,11 @@ export function useStreamChat() {
       if (res.status === 429) {
         const body = await res.json().catch(() => ({}));
         useChatStore.getState().setLimitError({ message: (body as { message?: string }).message ?? 'Usage limit reached.', resetAt: (body as { resetAt?: string }).resetAt });
+        // The backend rejected pre-flight — nothing was persisted, so remove BOTH
+        // temp messages (leaving the user bubble would show a message that
+        // silently vanishes on reload).
         useChatStore.getState().removeMessage(tempId);
+        useChatStore.getState().removeMessage(userTempId);
         return;
       }
 

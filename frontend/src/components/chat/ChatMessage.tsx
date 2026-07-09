@@ -1,3 +1,4 @@
+import { CopyButton } from '@/components/ui/copy-button';
 import type { ChatMessage as ChatMessageType } from '@/types/chat.types';
 import { MarkdownRenderer } from './MarkdownRenderer';
 import { ResultChart } from './ResultChart';
@@ -17,7 +18,7 @@ export function ChatMessage({ message }: { message: ChatMessageType }) {
 
   // Assistant: bare left-aligned text + white cards (tool call, chart, table) — no bubble.
   return (
-    <div className="flex max-w-[640px] animate-in fade-in slide-in-from-bottom-3 flex-col gap-3 duration-300">
+    <div className="group/msg flex max-w-[640px] animate-in fade-in slide-in-from-bottom-3 flex-col gap-3 duration-300">
       {message.toolCalls?.map((tc, i) => (
         <ToolCallWidget
           key={i}
@@ -29,7 +30,11 @@ export function ChatMessage({ message }: { message: ChatMessageType }) {
 
       {message.content && (
         <>
-          <ResultChart content={message.content} />
+          {/* Chart only once the answer is complete: parsing/animating per token
+              restarts the bar animation on every re-render (jank), and the table
+              may still be mid-stream. Mounting it on completion plays the grow-in
+              animation exactly once. */}
+          {!message.streaming && <ResultChart content={message.content} />}
           <div className="text-[14.5px] leading-relaxed text-foreground">
             <MarkdownRenderer content={message.content} caret={message.streaming} />
           </div>
@@ -37,6 +42,16 @@ export function ChatMessage({ message }: { message: ChatMessageType }) {
       )}
 
       {message.streaming && !message.content && <StreamingIndicator />}
+
+      {/* FR-026 — copy the completed response (markdown source; hidden while streaming) */}
+      {message.content && !message.streaming && (
+        <CopyButton
+          text={message.content}
+          label="Copy response"
+          withLabel
+          className="-mt-1 self-start text-muted-foreground opacity-0 transition-opacity hover:bg-muted hover:text-foreground focus-visible:opacity-100 group-hover/msg:opacity-100"
+        />
+      )}
 
       {message.isPartial && (
         <p className="text-xs italic text-muted-foreground">

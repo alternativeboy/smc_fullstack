@@ -47,10 +47,13 @@ export function buildChart(content: string): ChartData | null {
   if (!table || table.rows.length < 2) return null;
   const { headers, rows } = table;
 
-  // Value column = the non-label column with the most numeric cells.
+  // Value column = the non-label column with the most numeric cells. Year-like
+  // columns are never the value — otherwise a | Company | Year | Revenue | table
+  // would tie on numeric count and chart 2022–2025 as the values.
   let bestCol = -1;
   let bestCount = 0;
   for (let c = 1; c < headers.length; c++) {
+    if (/\b(year|fiscal|fy|quarter)\b/i.test(headers[c])) continue;
     const count = rows.filter((r) => parseFinancialNumber(r[c]) != null).length;
     if (count > bestCount) {
       bestCount = count;
