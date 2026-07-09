@@ -2,31 +2,58 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+ * v3 theme (frontend/design …v3). Light main (blue-gray neutrals, hue 220) with a
+ * DARK navy-teal sidebar, brighter emerald primary, and green→teal gradients + glows.
+ * Tokens are bare oklch "L C H" triplets consumed via oklch(var(--x) / <alpha-value>)
+ * so /opacity utilities keep working. The dark sidebar is styled explicitly (bg-sidebar-dark).
+ */
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
-    --radius: 0.5rem;
+    --background: 1 0 0;              /* white main surface */
+    --foreground: 0.18 0.02 220;     /* near-black navy text */
+    --card: 1 0 0;
+    --card-foreground: 0.25 0.02 220;
+    --popover: 1 0 0;
+    --popover-foreground: 0.25 0.02 220;
+    --primary: 0.72 0.19 155;        /* vivid emerald */
+    --primary-foreground: 1 0 0;
+    --secondary: 0.92 0.05 155;      /* soft green badge/accent */
+    --secondary-foreground: 0.4 0.08 155;
+    --muted: 0.96 0.006 220;         /* neutral blue-gray hover */
+    --muted-foreground: 0.55 0.015 220;
+    --accent: 0.92 0.05 155;
+    --accent-foreground: 0.4 0.08 155;
+    --destructive: 0.58 0.17 28;     /* terracotta (delete-confirm; mockup has no red) */
+    --destructive-foreground: 1 0 0;
+    --border: 0.92 0.006 90;
+    --input: 0.91 0.006 90;
+    --ring: 0.72 0.19 155;
+    --warning: 0.97 0.04 55;         /* amber limit banner */
+    --warning-border: 0.83 0.09 60;
+    --warning-foreground: 0.32 0.07 55;
+    --radius: 0.75rem;
   }
+
   * {
     @apply border-border;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground font-sans antialiased;
+  }
+  ::selection {
+    background: oklch(0.75 0.15 155 / 0.35);
+  }
+
+  /* Accessibility: honour reduced-motion — kill animations/transitions globally. */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
   }
 }
