@@ -1,4 +1,4 @@
-import { BarChart3, Plus } from 'lucide-react';
+import { BarChart3, LogOut, Plus } from 'lucide-react';
 import { useEffect, useRef } from 'react';
 import { ChatInput } from '@/components/chat/ChatInput';
 import { ChatMessage } from '@/components/chat/ChatMessage';
@@ -89,40 +89,40 @@ export function ChatPage() {
 
   return (
     <div className="flex h-screen bg-background text-foreground">
-      {/* Sidebar */}
-      <aside className="flex w-[280px] flex-col border-r border-sidebar-border bg-sidebar px-4 py-5">
-        <div className="mb-5 flex items-center gap-2.5 px-2">
-          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald shadow-green">
-            <span className="h-2.5 w-2.5 rounded-[3px] bg-primary-foreground" />
+      {/* Dark sidebar */}
+      <aside className="flex w-[284px] flex-col bg-sidebar-dark px-4 py-5">
+        <div className="mb-6 flex items-center gap-2.5 px-2">
+          <span className="flex h-8 w-8 items-center justify-center rounded-[10px] bg-emerald bg-[length:200%_200%] shadow-green animate-gradient-shift">
+            <span className="h-[13px] w-[13px] rounded-[4px] bg-white" />
           </span>
-          <span className="text-[15px] font-extrabold tracking-tight">Finch</span>
+          <span className="text-[15.5px] font-extrabold tracking-tight text-white">Finch</span>
         </div>
 
         <button
           onClick={newChat}
-          className="flex w-full items-center justify-center gap-1.5 rounded-xl bg-emerald py-2.5 text-sm font-semibold text-primary-foreground shadow-green transition hover:brightness-105 active:scale-[0.98]"
+          className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald bg-[length:200%_200%] py-3 text-sm font-bold text-[oklch(0.16_0.04_170)] shadow-green transition hover:brightness-105 active:scale-[0.98] animate-glow"
         >
-          <Plus className="h-4 w-4" /> New chat
+          <Plus className="h-4 w-4" strokeWidth={2.5} /> New chat
         </button>
 
-        <p className="mb-1 mt-6 px-2 font-mono text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+        <p className="mb-2.5 mt-6 px-2 font-mono text-[10.5px] font-bold uppercase tracking-[0.1em] text-[oklch(0.55_0.02_145)]">
           Recent
         </p>
         <ConversationList onSelect={openConversation} />
 
-        <div className="mt-auto border-t border-sidebar-border pt-3">
+        <div className="mt-auto border-t border-white/10 pt-3">
           <UsageBadge />
           <button
             onClick={logout}
-            className="mt-1 w-full rounded-lg px-3 py-1.5 text-left text-xs text-muted-foreground transition-colors hover:bg-muted"
+            className="mt-1 flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs text-[oklch(0.6_0.02_220)] transition hover:bg-white/10"
           >
-            Log out
+            <LogOut className="h-3.5 w-3.5" /> Log out
           </button>
         </div>
       </aside>
 
-      {/* Main */}
-      <div className="flex flex-1 flex-col">
+      {/* Light main */}
+      <div className="flex flex-1 flex-col bg-gradient-to-b from-white to-[oklch(0.985_0.006_145)]">
         <header className="flex h-16 flex-shrink-0 items-center justify-between border-b px-8">
           <h1 className="truncate text-lg font-extrabold tracking-tight">{activeTitle}</h1>
         </header>
@@ -135,14 +135,14 @@ export function ChatPage() {
                   aria-hidden
                   className="pointer-events-none absolute left-1/2 top-20 h-64 w-64 -translate-x-1/2 rounded-full bg-emerald-soft blur-2xl"
                 />
-                <span className="relative flex h-16 w-16 items-center justify-center rounded-[20px] bg-emerald shadow-green">
-                  <BarChart3 className="h-7 w-7 text-primary-foreground" />
+                <span className="relative flex h-[72px] w-[72px] items-center justify-center rounded-[22px] bg-emerald shadow-green">
+                  <BarChart3 className="h-8 w-8 text-white" />
                 </span>
                 <div className="relative space-y-3">
-                  <h2 className="bg-gradient-to-br from-[oklch(0.32_0.05_155)] to-primary bg-clip-text text-4xl font-extrabold tracking-tight text-transparent">
+                  <h2 className="bg-gradient-to-br from-[oklch(0.2_0.02_220)] to-primary bg-clip-text text-[28px] font-extrabold tracking-tight text-transparent">
                     Ask anything about your financial data
                   </h2>
-                  <p className="text-base text-muted-foreground">
+                  <p className="text-[15.5px] text-muted-foreground">
                     Income-statement data for 49 U.S. public companies, 2022–2025.
                   </p>
                 </div>
@@ -156,12 +156,14 @@ export function ChatPage() {
         </main>
 
         {limitError && (
-          <div className="animate-in fade-in slide-in-from-bottom-2 border-t border-warning-border bg-warning px-8 py-3 text-center text-warning-foreground duration-300">
-            <p className="text-sm font-semibold">{limitError.message}</p>
-            <p className="text-xs opacity-80">Resets in ~{resetsIn(limitError.resetAt)}.</p>
+          <div className="mx-8 mb-5 flex animate-in fade-in slide-in-from-bottom-2 items-center gap-4 rounded-2xl border border-warning-border bg-warning px-5 py-4 text-warning-foreground shadow-[0_6px_18px_-8px_oklch(0.6_0.1_60/0.3)] duration-300">
+            <div className="flex-1 text-left">
+              <p className="text-sm font-extrabold">{limitError.message}</p>
+              <p className="text-xs opacity-80">Resets in ~{resetsIn(limitError.resetAt)}.</p>
+            </div>
             <button
               type="button"
-              className="mt-1.5 rounded-lg border border-warning-border px-3 py-1 text-xs font-semibold"
+              className="shrink-0 rounded-[11px] border border-warning-border bg-white px-4 py-2 text-xs font-bold transition hover:brightness-95"
               onClick={() => useChatStore.getState().setLimitError(null)}
             >
               Try again

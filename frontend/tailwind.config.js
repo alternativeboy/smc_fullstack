@@ -23,8 +23,17 @@ export default {
         accent: { DEFAULT: c('--accent'), foreground: c('--accent-foreground') },
         card: { DEFAULT: c('--card'), foreground: c('--card-foreground') },
         popover: { DEFAULT: c('--popover'), foreground: c('--popover-foreground') },
-        sidebar: { DEFAULT: c('--sidebar'), border: c('--sidebar-border') },
         warning: { DEFAULT: c('--warning'), border: c('--warning-border'), foreground: c('--warning-foreground') },
+      },
+      backgroundImage: {
+        // Green→teal gradients on brand/CTA/accent surfaces only (never on data surfaces).
+        emerald: 'linear-gradient(135deg, oklch(0.72 0.19 155), oklch(0.6 0.18 172))',
+        'emerald-soft': 'radial-gradient(closest-side, oklch(0.85 0.14 155 / 0.35), transparent)',
+        'sidebar-dark': 'linear-gradient(165deg, oklch(0.18 0.03 220), oklch(0.14 0.025 240))',
+        'sql-dark': 'linear-gradient(165deg, oklch(0.2 0.03 250), oklch(0.15 0.025 260))',
+        'table-head': 'linear-gradient(90deg, oklch(0.95 0.03 155), oklch(0.96 0.015 200))',
+        shimmer:
+          'linear-gradient(90deg, oklch(0.95 0.006 90) 25%, oklch(0.9 0.02 155) 37%, oklch(0.95 0.006 90) 63%)',
       },
       borderRadius: {
         lg: 'var(--radius)',
@@ -32,21 +41,25 @@ export default {
         sm: 'calc(var(--radius) - 4px)',
       },
       boxShadow: {
-        green: '0 3px 8px oklch(0.62 0.13 155 / 0.35)',
-        'green-lg': '0 4px 12px oklch(0.62 0.13 155 / 0.28)',
-        frame: '0 1px 2px oklch(0.2 0 0 / 0.04), 0 24px 48px -12px oklch(0.2 0.02 250 / 0.16)',
-      },
-      backgroundImage: {
-        // Tasteful emerald gradients — used only on brand/CTA/accent surfaces,
-        // never on data surfaces (tables/SQL stay flat for readability).
-        emerald: 'linear-gradient(160deg, oklch(0.67 0.14 155), oklch(0.57 0.13 155))',
-        'emerald-soft': 'radial-gradient(closest-side, oklch(0.9 0.06 155 / 0.55), transparent)',
+        green: '0 6px 16px oklch(0.65 0.19 155 / 0.4)',
+        'green-lg': '0 8px 20px -6px oklch(0.6 0.18 165 / 0.5)',
+        card: '0 4px 16px -8px oklch(0.2 0.02 220 / 0.14)',
+        frame: '0 2px 4px oklch(0.2 0 0 / 0.04), 0 40px 80px -20px oklch(0.35 0.1 155 / 0.28)',
       },
       keyframes: {
         caret: { '0%,49%': { opacity: '1' }, '50%,100%': { opacity: '0' } },
+        shimmer: { '0%': { backgroundPosition: '200% 0' }, '100%': { backgroundPosition: '-200% 0' } },
+        glowPulse: {
+          '0%,100%': { boxShadow: '0 6px 16px oklch(0.65 0.19 155 / 0.4)' },
+          '50%': { boxShadow: '0 6px 22px oklch(0.65 0.19 155 / 0.65)' },
+        },
+        gradientShift: { '0%,100%': { backgroundPosition: '0% 50%' }, '50%': { backgroundPosition: '100% 50%' } },
       },
       animation: {
         caret: 'caret 1s steps(1) infinite',
+        shimmer: 'shimmer 1.6s linear infinite',
+        glow: 'glowPulse 3.5s ease-in-out infinite',
+        'gradient-shift': 'gradientShift 6s ease infinite',
       },
     },
   },

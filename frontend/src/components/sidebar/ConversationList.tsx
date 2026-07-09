@@ -33,7 +33,7 @@ export function ConversationList({ onSelect }: { onSelect: (id: string) => void 
   return (
     <div className="flex-1 space-y-0.5 overflow-y-auto">
       {conversations.length === 0 && (
-        <p className="px-2 py-2 text-[13px] text-muted-foreground">
+        <p className="px-2 py-2 text-[13px] text-[oklch(0.6_0.02_220)]">
           No conversations yet — your chats will show up here.
         </p>
       )}

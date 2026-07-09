@@ -8,7 +8,7 @@ export function ChatMessage({ message }: { message: ChatMessageType }) {
   if (message.role === 'user') {
     return (
       <div className="flex justify-end">
-        <div className="max-w-[520px] animate-in fade-in slide-in-from-bottom-3 whitespace-pre-wrap rounded-[16px_16px_4px_16px] bg-primary px-[18px] py-3 text-[14.5px] font-medium text-primary-foreground shadow-green-lg duration-300">
+        <div className="max-w-[520px] animate-in fade-in slide-in-from-bottom-3 whitespace-pre-wrap rounded-[18px_18px_4px_18px] bg-emerald px-[19px] py-3 text-[14.5px] font-semibold text-white shadow-green-lg duration-300">
           {message.content}
         </div>
       </div>

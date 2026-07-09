@@ -19,14 +19,14 @@ export function MarkdownRenderer({ content, caret }: { content: string; caret?: 
         remarkPlugins={[remarkGfm]}
         components={{
           table: ({ node, ...props }) => (
-            <div className="my-3 overflow-hidden rounded-2xl border">
+            <div className="my-3 overflow-hidden rounded-[16px] border shadow-card">
               <table className="w-full border-collapse text-[13.5px]" {...props} />
             </div>
           ),
-          thead: ({ node, ...props }) => <thead className="bg-[oklch(0.97_0.006_90)]" {...props} />,
+          thead: ({ node, ...props }) => <thead className="bg-table-head" {...props} />,
           th: ({ node, ...props }) => (
             <th
-              className="px-4 py-3 text-left font-mono text-[12px] font-bold uppercase tracking-[0.04em] text-muted-foreground"
+              className="px-[19px] py-3 text-left font-mono text-[11.5px] font-extrabold uppercase tracking-[0.05em] text-[oklch(0.42_0.05_165)]"
               {...props}
             />
           ),

@@ -12,14 +12,14 @@ export function ResultChart({ content }: { content: string }) {
   if (!chart) return null;
 
   return (
-    <div className="max-w-[640px] animate-in fade-in rounded-2xl border bg-card p-5 shadow-sm duration-300">
+    <div className="max-w-[640px] animate-in fade-in rounded-[18px] border bg-card p-6 shadow-card duration-300">
       <p className="mb-3 text-[13.5px] font-bold text-foreground">{chart.valueLabel}</p>
       <ResponsiveContainer width="100%" height={200}>
         <BarChart data={chart.data} margin={{ top: 22, right: 8, bottom: 4, left: 8 }}>
           <defs>
             <linearGradient id="fr024BarGreen" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="oklch(0.68 0.14 155)" />
-              <stop offset="100%" stopColor="oklch(0.58 0.13 155)" />
+              <stop offset="0%" stopColor="oklch(0.74 0.18 155)" />
+              <stop offset="100%" stopColor="oklch(0.55 0.17 170)" />
             </linearGradient>
           </defs>
           <XAxis

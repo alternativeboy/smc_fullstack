@@ -9,7 +9,7 @@ function resetsIn(resetAt?: string): string | null {
   return min < 60 ? `${min} min` : `${Math.ceil(min / 60)} h`;
 }
 
-// Sidebar user + usage card (FR-021 spend display).
+// Sidebar user + usage card (FR-021 spend display) — on the DARK sidebar.
 export function UsageBadge() {
   const user = useAuthStore((s) => s.user);
   const status = useUsageStore((s) => s.status);
@@ -18,19 +18,19 @@ export function UsageBadge() {
   const reset = resetsIn(status?.resetAt);
 
   return (
-    <div className="flex items-center gap-2.5 rounded-xl px-2 py-2">
-      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald text-[13px] font-bold text-primary-foreground">
+    <div className="flex items-center gap-2.5 rounded-[13px] px-2 py-2">
+      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald text-[13px] font-extrabold text-[oklch(0.16_0.04_170)]">
         {initials}
       </span>
       <div className="min-w-0 flex-1">
-        <p className="truncate text-[13px] font-semibold text-foreground">{label}</p>
+        <p className="truncate text-[13px] font-bold text-white">{label}</p>
         {status ? (
-          <p className="truncate text-[11px] text-muted-foreground">
+          <p className="truncate text-[11px] text-[oklch(0.65_0.02_220)]">
             ${status.currentSpend.toFixed(2)} of ${status.limit.toFixed(2)} used
             {reset ? ` · resets ~${reset}` : ''}
           </p>
         ) : (
-          <p className="text-[11px] text-muted-foreground">Loading usage…</p>
+          <p className="text-[11px] text-[oklch(0.6_0.02_220)]">Loading usage…</p>
         )}
       </div>
     </div>
