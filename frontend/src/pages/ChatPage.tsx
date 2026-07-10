@@ -1,11 +1,12 @@
-import { BarChart3, LogOut, Plus } from 'lucide-react';
-import { useEffect, useRef } from 'react';
+import { BarChart3, LogOut, Menu, Plus, X } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
 import { ChatInput } from '@/components/chat/ChatInput';
 import { ChatMessage } from '@/components/chat/ChatMessage';
 import { UsageBadge } from '@/components/layout/UsageBadge';
 import { ConversationList } from '@/components/sidebar/ConversationList';
 import { useStreamChat } from '@/hooks/useStreamChat';
 import { useUsage } from '@/hooks/useUsage';
+import { cn } from '@/lib/utils';
 import { authService } from '@/services/auth.service';
 import { chatService } from '@/services/chat.service';
 import { useAuthStore } from '@/stores/auth.store';
@@ -29,6 +30,7 @@ export function ChatPage() {
   const { send, stop, isStreaming } = useStreamChat();
   const { refresh: refreshUsage } = useUsage();
   const bottomRef = useRef<HTMLDivElement>(null);
+  const [sidebarOpen, setSidebarOpen] = useState(false); // mobile drawer
 
   const activeTitle = conversations.find((c) => c.id === activeId)?.title ?? 'Financial Data Chat';
 
@@ -50,6 +52,7 @@ export function ChatPage() {
   };
 
   const openConversation = async (id: string) => {
+    setSidebarOpen(false); // close the drawer on selection (mobile)
     useChatStore.getState().setActive(id);
     const detail = await chatService.get(id);
     const normalized: ChatMessageType[] = detail.messages.map((m) => ({ ...m, content: m.content ?? '' }));
@@ -57,6 +60,7 @@ export function ChatPage() {
   };
 
   const newChat = async () => {
+    setSidebarOpen(false);
     const conv = await chatService.create();
     useChatStore.getState().addConversation(conv);
     useChatStore.getState().setActive(conv.id);
@@ -88,19 +92,42 @@ export function ChatPage() {
   };
 
   return (
-    <div className="flex h-screen bg-background text-foreground">
-      {/* Dark sidebar */}
-      <aside className="flex w-[284px] flex-col bg-sidebar-dark px-4 py-5">
-        <div className="mb-6 flex items-center gap-2.5 px-2">
-          <span className="flex h-8 w-8 items-center justify-center rounded-[10px] bg-emerald bg-[length:200%_200%] shadow-green animate-gradient-shift">
-            <span className="h-[13px] w-[13px] rounded-[4px] bg-white" />
-          </span>
-          <span className="text-[15.5px] font-extrabold tracking-tight text-white">Finch</span>
+    <div className="flex h-screen overflow-hidden bg-background text-foreground">
+      {/* Mobile backdrop */}
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 z-30 bg-black/40 backdrop-blur-sm lg:hidden"
+          onClick={() => setSidebarOpen(false)}
+          aria-hidden
+        />
+      )}
+
+      {/* Sidebar — off-canvas drawer < lg, static ≥ lg */}
+      <aside
+        className={cn(
+          'fixed inset-y-0 left-0 z-40 flex w-[284px] flex-col bg-sidebar-dark px-4 py-5 transition-transform duration-300 lg:static lg:z-auto lg:translate-x-0',
+          sidebarOpen ? 'translate-x-0' : '-translate-x-full',
+        )}
+      >
+        <div className="mb-6 flex items-center justify-between px-2">
+          <div className="flex items-center gap-2.5">
+            <span className="flex h-8 w-8 items-center justify-center rounded-[10px] bg-emerald bg-[length:200%_200%] shadow-green animate-gradient-shift">
+              <span className="h-[13px] w-[13px] rounded-[4px] bg-primary-foreground" />
+            </span>
+            <span className="text-[15.5px] font-extrabold tracking-tight text-white">Finch</span>
+          </div>
+          <button
+            onClick={() => setSidebarOpen(false)}
+            aria-label="Close menu"
+            className="rounded-lg p-1 text-[oklch(0.6_0.02_220)] transition hover:bg-white/10 hover:text-white lg:hidden"
+          >
+            <X className="h-5 w-5" />
+          </button>
         </div>
 
         <button
           onClick={newChat}
-          className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald bg-[length:200%_200%] py-3 text-sm font-bold text-[oklch(0.16_0.04_170)] shadow-green transition hover:brightness-105 active:scale-[0.98] animate-glow"
+          className="flex w-full items-center justify-center gap-1.5 rounded-xl bg-emerald bg-[length:200%_200%] py-2.5 text-sm font-semibold text-primary-foreground shadow-green transition hover:brightness-105 active:scale-[0.98] animate-glow"
         >
           <Plus className="h-4 w-4" strokeWidth={2.5} /> New chat
         </button>
@@ -121,28 +148,35 @@ export function ChatPage() {
         </div>
       </aside>
 
-      {/* Light main */}
-      <div className="flex flex-1 flex-col bg-gradient-to-b from-white to-[oklch(0.985_0.006_145)]">
-        <header className="flex h-16 flex-shrink-0 items-center justify-between border-b px-8">
+      {/* Main */}
+      <div className="flex min-w-0 flex-1 flex-col bg-gradient-to-b from-white to-[oklch(0.985_0.006_145)]">
+        <header className="flex h-16 flex-shrink-0 items-center gap-2 border-b px-4 lg:px-8">
+          <button
+            onClick={() => setSidebarOpen(true)}
+            aria-label="Open menu"
+            className="-ml-1 rounded-lg p-2 text-foreground transition hover:bg-muted lg:hidden"
+          >
+            <Menu className="h-5 w-5" />
+          </button>
           <h1 className="truncate text-lg font-extrabold tracking-tight">{activeTitle}</h1>
         </header>
 
-        <main className="flex-1 overflow-y-auto px-10 py-9">
+        <main className="flex-1 overflow-y-auto px-4 py-6 lg:px-10 lg:py-9">
           <div className="mx-auto flex max-w-3xl flex-col gap-6">
             {messages.length === 0 && (
-              <div className="relative flex animate-in fade-in flex-col items-center gap-7 pt-28 text-center duration-500">
+              <div className="relative flex animate-in fade-in flex-col items-center gap-6 pt-16 text-center duration-500 lg:gap-7 lg:pt-28">
                 <div
                   aria-hidden
-                  className="pointer-events-none absolute left-1/2 top-20 h-64 w-64 -translate-x-1/2 rounded-full bg-emerald-soft blur-2xl"
+                  className="pointer-events-none absolute left-1/2 top-12 h-56 w-56 -translate-x-1/2 rounded-full bg-emerald-soft blur-2xl lg:top-20 lg:h-64 lg:w-64"
                 />
-                <span className="relative flex h-[72px] w-[72px] items-center justify-center rounded-[22px] bg-emerald shadow-green">
-                  <BarChart3 className="h-8 w-8 text-white" />
+                <span className="relative flex h-16 w-16 items-center justify-center rounded-[20px] bg-emerald shadow-green">
+                  <BarChart3 className="h-7 w-7 text-white" />
                 </span>
                 <div className="relative space-y-3">
-                  <h2 className="bg-gradient-to-br from-[oklch(0.2_0.02_220)] to-primary bg-clip-text text-[28px] font-extrabold tracking-tight text-transparent">
+                  <h2 className="bg-gradient-to-br from-[oklch(0.2_0.02_220)] to-primary bg-clip-text text-2xl font-extrabold tracking-tight text-transparent lg:text-[28px]">
                     Ask anything about your financial data
                   </h2>
-                  <p className="text-[15.5px] text-muted-foreground">
+                  <p className="text-sm text-muted-foreground lg:text-base">
                     Income-statement data for 49 U.S. public companies, 2022–2025.
                   </p>
                 </div>
@@ -156,8 +190,8 @@ export function ChatPage() {
         </main>
 
         {limitError && (
-          <div className="mx-8 mb-5 flex animate-in fade-in slide-in-from-bottom-2 items-center gap-4 rounded-2xl border border-warning-border bg-warning px-5 py-4 text-warning-foreground shadow-[0_6px_18px_-8px_oklch(0.6_0.1_60/0.3)] duration-300">
-            <div className="flex-1 text-left">
+          <div className="mx-4 mb-4 flex animate-in fade-in slide-in-from-bottom-2 items-center gap-4 rounded-2xl border border-warning-border bg-warning px-5 py-4 text-warning-foreground shadow-[0_6px_18px_-8px_oklch(0.6_0.1_60/0.3)] duration-300 lg:mx-8">
+            <div className="min-w-0 flex-1 text-left">
               <p className="text-sm font-extrabold">{limitError.message}</p>
               <p className="text-xs opacity-80">Resets in ~{resetsIn(limitError.resetAt)}.</p>
             </div>
