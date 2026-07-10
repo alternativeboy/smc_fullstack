@@ -20,7 +20,11 @@ export function MarkdownRenderer({ content, caret }: { content: string; caret?: 
         components={{
           table: ({ node, ...props }) => (
             <div className="my-3 overflow-hidden rounded-[16px] border shadow-card">
-              <table className="w-full border-collapse text-[13.5px]" {...props} />
+              {/* inner scroll: a wide table scrolls within the card instead of
+                  overflowing the page (mobile) — outer overflow-hidden keeps the radius */}
+              <div className="overflow-x-auto">
+                <table className="w-full border-collapse text-[13.5px]" {...props} />
+              </div>
             </div>
           ),
           thead: ({ node, ...props }) => <thead className="bg-table-head" {...props} />,

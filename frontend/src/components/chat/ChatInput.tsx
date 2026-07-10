@@ -28,7 +28,7 @@ export function ChatInput({ onSend, onStop, isStreaming, disabled }: Props) {
   };
 
   return (
-    <form onSubmit={submit} className="flex-shrink-0 border-t px-8 pb-6 pt-4">
+    <form onSubmit={submit} className="flex-shrink-0 border-t px-4 pb-4 pt-3 lg:px-8 lg:pb-6 lg:pt-4">
       <div className="mx-auto max-w-3xl">
         <div
           className={cn(
