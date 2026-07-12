@@ -13,6 +13,16 @@ import { useAuthStore } from '@/stores/auth.store';
 import { useChatStore } from '@/stores/chat.store';
 import type { ChatMessage as ChatMessageType } from '@/types/chat.types';
 
+// FR-028 — curated to exercise different capabilities: a multi-company
+// comparison (table + chart), a single value, a trend question, and a
+// sector ranking. All answerable from the 49-company / 2022–2025 data.
+const EXAMPLE_PROMPTS = [
+  'Compare revenue of all Technology companies in 2024',
+  "What was Apple's net income in 2023?",
+  'Which company grew revenue the most from 2022 to 2025?',
+  'Top 5 companies by net income in 2024',
+];
+
 function resetsIn(resetAt?: string): string {
   if (!resetAt) return 'soon';
   const ms = new Date(resetAt).getTime() - Date.now();
@@ -179,6 +189,19 @@ export function ChatPage() {
                   <p className="text-sm text-muted-foreground lg:text-base">
                     Income-statement data for 49 U.S. public companies, 2022–2025.
                   </p>
+                </div>
+                {/* FR-028 — example prompts: send on click via the normal onSend path */}
+                <div className="relative flex w-full max-w-lg flex-wrap items-center justify-center gap-2">
+                  {EXAMPLE_PROMPTS.map((prompt) => (
+                    <button
+                      key={prompt}
+                      type="button"
+                      onClick={() => onSend(prompt)}
+                      className="rounded-full border border-border bg-card px-4 py-2 text-left text-sm text-foreground transition hover:border-primary/40 hover:bg-primary/5 hover:text-primary active:scale-[0.97]"
+                    >
+                      {prompt}
+                    </button>
+                  ))}
                 </div>
               </div>
             )}

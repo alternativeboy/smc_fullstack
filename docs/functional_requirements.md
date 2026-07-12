@@ -64,6 +64,7 @@
 | FR-025 | Auto-generate a conversation title from the first user message (replacing the default "New Chat"), set server-side when the first message is sent; unchanged on later messages | Low | derived (post-v1) | `[ ]` |
 | FR-026 | Copy-to-clipboard buttons on the generated SQL (tool-call widget) and on completed assistant responses, with visual "copied" feedback | Low | derived (post-v1) | `[ ]` |
 | FR-027 | Responsive layout — usable on phones/tablets: the chat sidebar collapses to a toggleable drawer (hamburger + backdrop), chat/composer/tables/charts fit and scroll with no horizontal page overflow; the auth page adapts | Medium | derived (post-v1) | `[ ]` |
+| FR-028 | Example-prompt suggestions on the empty chat screen — a few clickable prompt chips that send on click, to help discover the available companies/metrics/years | Low | derived (post-v1) | `[ ]` |
 
 ---
 
