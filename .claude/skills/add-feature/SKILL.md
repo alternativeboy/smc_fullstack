@@ -1,6 +1,11 @@
 ---
-description: Docs-first new feature per CLAUDE.md §8 — draft FR, impact-check, register in PROGRESS, then pause before coding
+name: add-feature
+description: >
+  Docs-first new feature per CLAUDE.md §8 — draft the FR, impact-check against locked
+  decisions, register in PROGRESS, then pause before coding. Use when the user invokes
+  "/add-feature" or asks to add/build a new feature in this project.
 argument-hint: <feature description>
+allowed-tools: Read, Write, Edit, Grep, Glob, Bash
 ---
 
 Add the feature described in the command arguments, following **CLAUDE.md §8** (docs lead,

@@ -1,6 +1,11 @@
 ---
-description: Run build + unit + e2e for the backend and produce PROGRESS-ready evidence (does not change status)
+name: verify
+description: >
+  Run build + unit + e2e for the backend and produce PROGRESS-ready evidence (does not
+  change status). Use when the user invokes "/verify" or asks to verify/run the test suite
+  for this project.
 argument-hint: (optional) test path or scenario, e.g. usage or S4
+allowed-tools: Bash, Read, Grep, Glob
 ---
 
 Run the verification suite and report concisely. Optional focus: **$ARGUMENTS**
