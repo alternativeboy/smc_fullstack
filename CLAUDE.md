@@ -143,6 +143,9 @@ streaming + visible tool call, grounding, usage limit, user isolation, S5 partia
   🔍 (ready for review) only, and every 🔍 must name its evidence (passing tests, command run,
   or manual check). Only the human moves items to ✅. Append a Session Log entry every session,
   including failed ones.
+- **`CONTEXT.md` is the verified-state snapshot** (only ✅ capabilities). When a feature is
+  signed off (🔍 → ✅), update `CONTEXT.md` in the same change — add it to the verified list and
+  bump the "last updated" line. Never put in-flight (🚧/🔍) items there; that's `PROGRESS.md`'s job.
 
 ---
 
