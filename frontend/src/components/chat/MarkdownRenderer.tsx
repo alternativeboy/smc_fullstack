@@ -1,10 +1,12 @@
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { rehypeCompanyLinks } from '@/lib/rehypeCompanyLinks';
 import { cn } from '@/lib/utils';
 
 /**
  * FR-006 — renders the assistant's markdown (GFM tables, code, lists). react-markdown
  * escapes raw HTML by default (no rehype-raw) so untrusted HTML is not injected.
+ * FR-029 — company names become Google-search links (see rehypeCompanyLinks).
  */
 export function MarkdownRenderer({ content, caret }: { content: string; caret?: boolean }) {
   return (
@@ -17,6 +19,7 @@ export function MarkdownRenderer({ content, caret }: { content: string; caret?: 
     >
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
+        rehypePlugins={[rehypeCompanyLinks]}
         components={{
           table: ({ node, ...props }) => (
             <div className="my-3 overflow-hidden rounded-[16px] border shadow-card">
