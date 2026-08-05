@@ -1,5 +1,5 @@
-import { BarChart3, LogOut, Menu, Plus, X } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { ArrowDown, BarChart3, LogOut, Menu, Plus, X } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ChatInput } from '@/components/chat/ChatInput';
 import { ChatMessage } from '@/components/chat/ChatMessage';
 import { UsageBadge } from '@/components/layout/UsageBadge';
@@ -23,6 +23,9 @@ const EXAMPLE_PROMPTS = [
   'Top 5 companies by net income in 2024',
 ];
 
+// How close to the bottom still counts as "following the stream" (FR-030).
+const NEAR_BOTTOM_PX = 80;
+
 function resetsIn(resetAt?: string): string {
   if (!resetAt) return 'soon';
   const ms = new Date(resetAt).getTime() - Date.now();
@@ -39,8 +42,12 @@ export function ChatPage() {
   const limitError = useChatStore((s) => s.limitError);
   const { send, stop, isStreaming } = useStreamChat();
   const { refresh: refreshUsage } = useUsage();
-  const bottomRef = useRef<HTMLDivElement>(null);
+  const scrollerRef = useRef<HTMLElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+  const wasStreaming = useRef(false);
+  const programmatic = useRef(false); // a scroll we started, not the user
   const [sidebarOpen, setSidebarOpen] = useState(false); // mobile drawer
+  const [followBottom, setFollowBottom] = useState(true); // FR-030 — auto-scroll only while pinned
 
   const activeTitle = conversations.find((c) => c.id === activeId)?.title ?? 'Financial Data Chat';
 
@@ -48,9 +55,57 @@ export function ChatPage() {
     void loadConversations();
   }, []);
 
+  const scrollToBottom = useCallback((smooth: boolean) => {
+    const el = scrollerRef.current;
+    if (!el) return;
+    programmatic.current = true;
+    el.scrollTo({ top: el.scrollHeight, behavior: smooth ? 'smooth' : 'auto' });
+  }, []);
+
+  // FR-030 — follow the stream only while the user is already at the bottom, so
+  // scrolling up to re-read a table isn't undone by the next token. Always
+  // instant here: tokens land many times a second and each smooth scroll
+  // restarts the previous one, which reads as stutter.
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+    if (followBottom) scrollToBottom(false);
+  }, [messages, followBottom, scrollToBottom]);
+
+  const onScroll = () => {
+    const el = scrollerRef.current;
+    if (!el) return;
+    const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight <= NEAR_BOTTOM_PX;
+    // A smooth programmatic scroll emits frames far from the bottom; reading
+    // those as user intent would cancel the very scroll we just started.
+    if (programmatic.current) {
+      if (atBottom) programmatic.current = false;
+      return;
+    }
+    setFollowBottom(atBottom);
+  };
+
+  // Real input outranks an in-flight programmatic scroll — scrolling up during
+  // one must take effect, not be swallowed as an animation frame.
+  const onUserScrollIntent = () => {
+    programmatic.current = false;
+  };
+
+  // FR-030 — Esc stops a stream (the Stop button stays the discoverable path).
+  useEffect(() => {
+    if (!isStreaming) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') stop();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [isStreaming, stop]);
+
+  // FR-030 — return focus to the composer when a turn ends, so a follow-up
+  // question doesn't need a click first. Only on the streaming→idle edge, never
+  // on mount (which would pop the keyboard open on mobile).
+  useEffect(() => {
+    if (wasStreaming.current && !isStreaming) inputRef.current?.focus();
+    wasStreaming.current = isStreaming;
+  }, [isStreaming]);
 
   const loadConversations = async () => {
     const res = await chatService.list().catch(() => null);
@@ -79,6 +134,7 @@ export function ChatPage() {
   };
 
   const onSend = async (content: string) => {
+    setFollowBottom(true); // sending is an explicit "show me the answer"
     let id = useChatStore.getState().activeId;
     if (!id) {
       const conv = await chatService.create();
@@ -159,7 +215,7 @@ export function ChatPage() {
       </aside>
 
       {/* Main */}
-      <div className="flex min-w-0 flex-1 flex-col bg-gradient-to-b from-white to-[oklch(0.985_0.006_145)]">
+      <div className="relative flex min-w-0 flex-1 flex-col bg-gradient-to-b from-white to-[oklch(0.985_0.006_145)]">
         <header className="flex h-16 flex-shrink-0 items-center gap-2 border-b px-4 lg:px-8">
           <button
             onClick={() => setSidebarOpen(true)}
@@ -171,7 +227,13 @@ export function ChatPage() {
           <h1 className="truncate text-lg font-extrabold tracking-tight">{activeTitle}</h1>
         </header>
 
-        <main className="flex-1 overflow-y-auto px-4 py-6 lg:px-10 lg:py-9">
+        <main
+          ref={scrollerRef}
+          onScroll={onScroll}
+          onWheel={onUserScrollIntent}
+          onTouchMove={onUserScrollIntent}
+          className="flex-1 overflow-y-auto px-4 py-6 lg:px-10 lg:py-9"
+        >
           <div className="mx-auto flex max-w-3xl flex-col gap-6">
             {messages.length === 0 && (
               <div className="relative flex animate-in fade-in flex-col items-center gap-6 pt-16 text-center duration-500 lg:gap-7 lg:pt-28">
@@ -205,12 +267,39 @@ export function ChatPage() {
                 </div>
               </div>
             )}
-            {messages.map((m) => (
-              <ChatMessage key={m.id} message={m} />
-            ))}
-            <div ref={bottomRef} />
+            {messages.map((m, i) => {
+              // FR-030 — a stopped/failed turn can be re-asked. Live messages carry
+              // the prompt; for turns restored from history fall back to the user
+              // message directly above.
+              const prompt =
+                m.role === 'assistant' && (m.isPartial || m.error) && !m.streaming
+                  ? (m.prompt ?? (messages[i - 1]?.role === 'user' ? messages[i - 1].content : undefined))
+                  : undefined;
+              return (
+                <ChatMessage
+                  key={m.id}
+                  message={m}
+                  onRetry={prompt && !isStreaming && !limitError ? () => onSend(prompt) : undefined}
+                />
+              );
+            })}
           </div>
         </main>
+
+        {/* FR-030 — scrolled away mid-answer: say so, and offer one click back. */}
+        {!followBottom && messages.length > 0 && (
+          <button
+            type="button"
+            onClick={() => {
+              setFollowBottom(true);
+              scrollToBottom(true);
+            }}
+            className="absolute bottom-28 left-1/2 z-20 flex -translate-x-1/2 animate-in fade-in slide-in-from-bottom-2 items-center gap-1.5 rounded-full border border-border bg-card px-3.5 py-2 text-xs font-semibold text-foreground shadow-card transition hover:border-primary/40 hover:text-primary active:scale-95"
+          >
+            <ArrowDown className="h-3.5 w-3.5" />
+            {isStreaming ? 'Jump to latest' : 'Scroll to bottom'}
+          </button>
+        )}
 
         {limitError && (
           <div className="mx-4 mb-4 flex animate-in fade-in slide-in-from-bottom-2 items-center gap-4 rounded-2xl border border-warning-border bg-warning px-5 py-4 text-warning-foreground shadow-[0_6px_18px_-8px_oklch(0.6_0.1_60/0.3)] duration-300 lg:mx-8">
@@ -228,7 +317,13 @@ export function ChatPage() {
           </div>
         )}
 
-        <ChatInput onSend={onSend} onStop={stop} isStreaming={isStreaming} disabled={!!limitError} />
+        <ChatInput
+          onSend={onSend}
+          onStop={stop}
+          isStreaming={isStreaming}
+          disabled={!!limitError}
+          textareaRef={inputRef}
+        />
       </div>
     </div>
   );

@@ -1,4 +1,4 @@
-import { ChevronDown, Database } from 'lucide-react';
+import { ChevronDown, Database, Loader2 } from 'lucide-react';
 import { useState } from 'react';
 import { CopyButton } from '@/components/ui/copy-button';
 import { cn } from '@/lib/utils';
@@ -31,7 +31,11 @@ export function ToolCallWidget({ toolCall, toolResult, running }: Props) {
           </span>
           <span className="font-mono text-[13px] font-semibold text-foreground">execute_sql</span>
           {running ? (
-            <span className="text-xs text-muted-foreground">running…</span>
+            // FR-030 — a spinner reads as "still working"; static text reads as stuck.
+            <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+              <Loader2 className="h-3 w-3 animate-spin text-primary" />
+              running…
+            </span>
           ) : toolResult ? (
             <span className="rounded-full bg-secondary px-2 py-0.5 text-[12px] font-semibold text-secondary-foreground">
               {toolResult.rowCount} row{toolResult.rowCount === 1 ? '' : 's'}

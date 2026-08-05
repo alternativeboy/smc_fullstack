@@ -1,5 +1,5 @@
 import { ArrowUp, Square } from 'lucide-react';
-import { type FormEvent, type KeyboardEvent, useState } from 'react';
+import { type FormEvent, type KeyboardEvent, type RefObject, useState } from 'react';
 import { cn } from '@/lib/utils';
 
 interface Props {
@@ -7,9 +7,11 @@ interface Props {
   onStop: () => void;
   isStreaming: boolean;
   disabled?: boolean;
+  /** FR-030 — lets the page return focus here when a stream ends. */
+  textareaRef?: RefObject<HTMLTextAreaElement>;
 }
 
-export function ChatInput({ onSend, onStop, isStreaming, disabled }: Props) {
+export function ChatInput({ onSend, onStop, isStreaming, disabled, textareaRef }: Props) {
   const [text, setText] = useState('');
 
   const submit = (e?: FormEvent) => {
@@ -37,6 +39,7 @@ export function ChatInput({ onSend, onStop, isStreaming, disabled }: Props) {
           )}
         >
           <textarea
+            ref={textareaRef}
             value={text}
             onChange={(e) => setText(e.target.value)}
             onKeyDown={onKeyDown}

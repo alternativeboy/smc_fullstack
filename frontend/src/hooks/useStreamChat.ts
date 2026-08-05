@@ -47,7 +47,17 @@ export function useStreamChat() {
       }
     }
     const tempId = `a-${Date.now()}`;
-    store.pushMessage({ id: tempId, role: 'assistant', content: '', streaming: true });
+    store.pushMessage({
+      id: tempId,
+      role: 'assistant',
+      content: '',
+      streaming: true,
+      // FR-030 — phase/startedAt drive the pending state; prompt lets a failed or
+      // interrupted turn be re-asked without retyping.
+      phase: 'thinking',
+      startedAt: Date.now(),
+      prompt: content,
+    });
 
     const controller = new AbortController();
     abortRef.current = controller;
@@ -110,10 +120,13 @@ export function useStreamChat() {
               s.patchMessage(tempId, (m) => ({ content: m.content + ev.data.content }));
               break;
             case 'tool_call':
-              s.patchMessage(tempId, (m) => ({ toolCalls: [...(m.toolCalls ?? []), ev.data] }));
+              // The SQL is fully written and about to execute (FR-030).
+              s.patchMessage(tempId, (m) => ({ toolCalls: [...(m.toolCalls ?? []), ev.data], phase: 'querying' }));
               break;
             case 'tool_result':
-              s.patchMessage(tempId, (m) => ({ toolResults: [...(m.toolResults ?? []), ev.data] }));
+              // Rows are back; the model is now writing the answer — unless it
+              // opens another round, which resets the phase on the next tool_call.
+              s.patchMessage(tempId, (m) => ({ toolResults: [...(m.toolResults ?? []), ev.data], phase: 'composing' }));
               break;
             case 'usage':
               s.patchMessage(tempId, { cost: ev.data.cost });

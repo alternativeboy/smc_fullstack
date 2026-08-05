@@ -66,6 +66,7 @@
 | FR-027 | Responsive layout — usable on phones/tablets: the chat sidebar collapses to a toggleable drawer (hamburger + backdrop), chat/composer/tables/charts fit and scroll with no horizontal page overflow; the auth page adapts | Medium | derived (post-v1) | `[ ]` |
 | FR-028 | Example-prompt suggestions on the empty chat screen — a few clickable prompt chips that send on click, to help discover the available companies/metrics/years | Low | derived (post-v1) | `[ ]` |
 | FR-029 | Company names in assistant answers (prose and table cells) render as links that open a Google search for that company in a new tab; SQL/code blocks are never linkified | Low | derived (post-v1) | `[ ]` |
+| FR-030 | Streaming wait/receive experience — the pending state names the phase the turn is actually in (thinking → writing SQL → running query → reading rows → composing) and shows elapsed time once the wait is noticeable; auto-scroll follows the stream only while the user is at the bottom, with a jump-to-latest control when they have scrolled away; interrupted and failed responses offer one-click retry; `Esc` stops a stream and focus returns to the composer when it ends | Medium | derived (post-v1) | `[ ]` |
 
 ---
 
